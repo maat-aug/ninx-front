@@ -1,0 +1,169 @@
+@page "/mainpage/venda"
+@page "/mainpage/produtos"
+@page "/mainpage/clientes"
+@page "/mainpage/relatorios"
+@page "/mainpage/assinatura"
+@page "/mainpage/gestao/usuarios"
+@page "/mainpage/gestao/categoria-produto"
+@page "/mainpage/gestao/comercio"
+@page "/mainpage/admin/assinatura-plano"
+@page "/mainpage/admin/usuario-comercios"
+@page "/mainpage/admin/pagamento-historico-assinatura-plano"
+@using NinxERP.Domain.Entities
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@Title — Ninx ERP</PageTitle>
+
+@if (Session.IsAuthenticated && HasPermission)
+{
+    <div class="mainpage-root">
+        <div class="bg-grid-dash"></div>
+        <div class="bg-glow-dash"></div>
+
+        <main class="main-content page-content">
+            <section class="page-panel narrow-panel">
+                <button class="back-button" @onclick="GoBack" title="Voltar">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <header class="page-header">
+                    <p class="page-kicker">@SectionName</p>
+                    <h1>@Title</h1>
+                    <p>@Description</p>
+                </header>
+
+                <div class="placeholder-card">
+                    <h2>@Title</h2>
+                    <p>Esta tela já está preparada na navegação para receber o conteúdo completo do módulo.</p>
+                    <p class="placeholder-note">Comércio atual: <strong>@Session.CurrentCommerce?.Name</strong></p>
+                </div>
+            </section>
+        </main>
+    </div>
+}
+else
+{
+    <div class="auth-guard">
+        <p>Acesso negado. Redirecionando...</p>
+    </div>
+}
+
+@code {
+    private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath.ToLowerInvariant();
+    private string Title { get; set; } = "Módulo";
+    private string Description { get; set; } = "Área operacional do Ninx ERP.";
+    private string SectionName { get; set; } = "Módulo";
+    private bool HasPermission { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        ConfigurePage();
+        HasPermission = ResolvePermission();
+
+        if (!HasPermission)
+        {
+            Navigation.NavigateTo("/mainpage");
+        }
+    }
+
+    private void ConfigurePage()
+    {
+        switch (CurrentPath)
+        {
+            case "/mainpage/venda":
+                Title = "Realizar Venda";
+                SectionName = "Operação";
+                Description = "Abra o caixa e registre vendas do comércio selecionado.";
+                break;
+            case "/mainpage/produtos":
+                Title = "Produtos e Estoque";
+                SectionName = "Cadastro";
+                Description = "Cadastre produtos e acompanhe quantidades em estoque.";
+                break;
+            case "/mainpage/clientes":
+                Title = "Meus Clientes";
+                SectionName = "Relacionamento";
+                Description = "Consulte e organize a base de clientes do comércio.";
+                break;
+            case "/mainpage/relatorios":
+                Title = "Relatórios e Gráficos";
+                SectionName = "Gerência";
+                Description = "Acompanhe indicadores, gráficos e relatórios de desempenho.";
+                break;
+            case "/mainpage/assinatura":
+                Title = "Minha Assinatura";
+                SectionName = "Gerência";
+                Description = "Visualize status do plano, renovação e informações de pagamento.";
+                break;
+            case "/mainpage/gestao/usuarios":
+                Title = "Usuários";
+                SectionName = "Gestão";
+                Description = "Gerencie usuários, acessos e funções da equipe.";
+                break;
+            case "/mainpage/gestao/categoria-produto":
+                Title = "CategoriaProduto";
+                SectionName = "Gestão";
+                Description = "Configure categorias utilizadas no cadastro de produtos.";
+                break;
+            case "/mainpage/gestao/comercio":
+                Title = "Comércio";
+                SectionName = "Gestão";
+                Description = "Atualize dados cadastrais e informações da unidade comercial.";
+                break;
+            case "/mainpage/admin/assinatura-plano":
+                Title = "AssinaturaPlano";
+                SectionName = "Admin";
+                Description = "Administre planos e assinaturas disponíveis no sistema.";
+                break;
+            case "/mainpage/admin/usuario-comercios":
+                Title = "UsuarioComercios";
+                SectionName = "Admin";
+                Description = "Gerencie os vínculos entre usuários e comércios.";
+                break;
+            case "/mainpage/admin/pagamento-historico-assinatura-plano":
+                Title = "PagamentoHistoricoAssinaturaPlano";
+                SectionName = "Admin";
+                Description = "Consulte históricos de pagamentos relacionados às assinaturas.";
+                break;
+        }
+    }
+
+    private bool ResolvePermission()
+    {
+        if (CurrentPath.StartsWith("/mainpage/admin/"))
+        {
+            return Session.IsAdmin;
+        }
+
+        if (CurrentPath.StartsWith("/mainpage/gestao/") ||
+            CurrentPath is "/mainpage/relatorios" or "/mainpage/assinatura")
+        {
+            return Session.IsManager;
+        }
+
+        return true;
+    }
+
+    private void GoBack()
+    {
+        if (CurrentPath.StartsWith("/mainpage/gestao/"))
+        {
+            Navigation.NavigateTo("/mainpage/gestao");
+            return;
+        }
+
+        if (CurrentPath.StartsWith("/mainpage/admin/"))
+        {
+            Navigation.NavigateTo("/mainpage/admin");
+            return;
+        }
+
+        Navigation.NavigateTo("/mainpage");
+    }
+}

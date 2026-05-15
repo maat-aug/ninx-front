@@ -1,0 +1,76 @@
+@page "/mainpage/admin"
+@using NinxERP.Domain.Entities
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Painel Admin — Ninx ERP</PageTitle>
+
+@if (Session.IsAuthenticated && Session.IsAdmin)
+{
+    <div class="mainpage-root">
+        <div class="bg-grid-dash"></div>
+        <div class="bg-glow-dash"></div>
+
+        <main class="main-content page-content">
+            <section class="page-panel">
+                <button class="back-button" @onclick="GoBack" title="Voltar">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <header class="page-header">
+                    <p class="page-kicker">Área administrativa</p>
+                    <h1>Painel Admin</h1>
+                    <p>Gerencie recursos administrativos globais do sistema.</p>
+                </header>
+
+                <div class="action-grid compact-grid">
+                    <div class="action-card admin-card" @onclick='() => NavigateTo("admin/assinatura-plano")'>
+                        <div class="card-letter">AP</div>
+                        <h2 class="card-title">AssinaturaPlano</h2>
+                        <p class="card-desc">Administrar planos, assinaturas e regras comerciais.</p>
+                    </div>
+
+                    <div class="action-card admin-card" @onclick='() => NavigateTo("admin/usuario-comercios")'>
+                        <div class="card-letter">UC</div>
+                        <h2 class="card-title">UsuarioComercios</h2>
+                        <p class="card-desc">Controlar vínculos entre usuários e comércios.</p>
+                    </div>
+
+                    <div class="action-card admin-card" @onclick='() => NavigateTo("admin/pagamento-historico-assinatura-plano")'>
+                        <div class="card-letter">PH</div>
+                        <h2 class="card-title">PagamentoHistoricoAssinaturaPlano</h2>
+                        <p class="card-desc">Consultar históricos de pagamento das assinaturas.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+}
+else
+{
+    <div class="auth-guard">
+        <p>Acesso negado. Redirecionando...</p>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (!Session.IsAdmin)
+        {
+            Navigation.NavigateTo("/mainpage");
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/mainpage");
+
+    private void NavigateTo(string route)
+    {
+        Navigation.NavigateTo($"/mainpage/{route}");
+    }
+}

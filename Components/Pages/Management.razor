@@ -1,0 +1,76 @@
+@page "/mainpage/gestao"
+@using NinxERP.Domain.Entities
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Gestão — Ninx ERP</PageTitle>
+
+@if (Session.IsAuthenticated && Session.IsManager)
+{
+    <div class="mainpage-root">
+        <div class="bg-grid-dash"></div>
+        <div class="bg-glow-dash"></div>
+
+        <main class="main-content page-content">
+            <section class="page-panel">
+                <button class="back-button" @onclick="GoBack" title="Voltar">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <header class="page-header">
+                    <p class="page-kicker">Área do gerente</p>
+                    <h1>Gestão</h1>
+                    <p>Controle os cadastros operacionais do comércio selecionado.</p>
+                </header>
+
+                <div class="action-grid compact-grid">
+                    <div class="action-card" @onclick='() => NavigateTo("gestao/usuarios")'>
+                        <div class="card-letter">US</div>
+                        <h2 class="card-title">Usuários</h2>
+                        <p class="card-desc">Gerenciar usuários, acessos e funções da equipe.</p>
+                    </div>
+
+                    <div class="action-card" @onclick='() => NavigateTo("gestao/categoria-produto")'>
+                        <div class="card-letter">CP</div>
+                        <h2 class="card-title">CategoriaProduto</h2>
+                        <p class="card-desc">Organizar categorias utilizadas no cadastro de produtos.</p>
+                    </div>
+
+                    <div class="action-card" @onclick='() => NavigateTo("gestao/comercio")'>
+                        <div class="card-letter">CO</div>
+                        <h2 class="card-title">Comércio</h2>
+                        <p class="card-desc">Atualizar dados da unidade e informações comerciais.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+}
+else
+{
+    <div class="auth-guard">
+        <p>Acesso negado. Redirecionando...</p>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (!Session.IsManager)
+        {
+            Navigation.NavigateTo("/mainpage");
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/mainpage");
+
+    private void NavigateTo(string route)
+    {
+        Navigation.NavigateTo($"/mainpage/{route}");
+    }
+}
