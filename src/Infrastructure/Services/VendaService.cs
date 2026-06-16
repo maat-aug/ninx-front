@@ -1,0 +1,113 @@
+using NinxERP.Domain.DTOs;
+using NinxERP.Domain.Interfaces;
+using NinxERP.Infrastructure.Config;
+using System;
+using System.Net.Http.Json;
+
+namespace NinxERP.Infrastructure.Services;
+
+public class VendaService : IVendaService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ApiConfiguration _config;
+
+    public VendaService(HttpClient httpClient, ApiConfiguration config)
+    {
+        _httpClient = httpClient;
+        _config = config;
+    }
+
+    public async Task<ProdutoDTO?> GetProdutoPorCodigoBarrasAsync(string codigoBarras)
+    {
+        try
+        {
+            // Garante que o código de barras seja enviado corretamente como string na URL
+            var url = _config.GetEndpointUrl($"/api/Produto/codigo-barras/{Uri.EscapeDataString(codigoBarras)}");
+            return await _httpClient.GetFromJsonAsync<ProdutoDTO>(url);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<List<ClienteDTO>> BuscarClientesAsync(string nome)
+   {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<List<ClienteDTO>>(_config.GetEndpointUrl($"/api/Cliente/nome/{Uri.EscapeDataString(nome)}")) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    public async Task<VendaResponseDTO?> RealizarVendaAsync(VendaRequestDTO request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(_config.GetEndpointUrl("/api/Venda"), request);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<VendaResponseDTO>();
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<AssinaturaResponseDTO?> GetLinkAssinaturaAsync(Guid documentoGuid)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<AssinaturaResponseDTO>(_config.GetEndpointUrl($"/api/AssinaturaEletronica/{documentoGuid}"));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> IsVendaValidAsync(int vendaId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(_config.GetEndpointUrl($"/api/venda/isvendavalid/{vendaId}"));
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> DesistirVendaAsync(int vendaId)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync(_config.GetEndpointUrl($"/api/Venda/{vendaId}/estorno"), null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> VerificarDocumentoAssinadoAsync(Guid documentoGuid)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(_config.GetEndpointUrl($"/api/AssinaturaEletronica/assinado/{documentoGuid}"));
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}

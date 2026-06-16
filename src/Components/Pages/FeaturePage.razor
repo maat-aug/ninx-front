@@ -1,0 +1,126 @@
+@page "/mainpage/feature/{FeatureName}"
+@using NinxERP.Domain.Entities
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@Title — Ninx ERP</PageTitle>
+
+@if (Session.IsAuthenticated && HasPermission)
+{
+    <div class="mainpage-root">
+        <div class="bg-grid-dash"></div>
+        <div class="bg-glow-dash"></div>
+
+        <main class="main-content page-content">
+            <section class="page-panel narrow-panel">
+                <button class="back-button" @onclick="GoBack" title="Voltar">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <header class="page-header">
+                    <p class="page-kicker">@SectionName</p>
+                    <h1>@Title</h1>
+                    <p>@Description</p>
+                </header>
+
+                <div class="placeholder-card">
+                    <h2>@Title</h2>
+                    <p>Esta tela já está preparada na navegação para receber o conteúdo completo do módulo.</p>
+                    <p class="placeholder-note">Comércio atual: <strong>@Session.CurrentCommerceName</strong></p>
+                </div>
+            </section>
+        </main>
+    </div>
+}
+else
+{
+    <div class="auth-guard">
+        <div class="text-center">
+            <i class="bi bi-shield-lock text-danger" style="font-size: 3rem;"></i>
+            <h2 class="mt-3">Acesso Restrito</h2>
+            <p>Você não tem permissão para acessar esta área.</p>
+            <button class="btn btn-primary mt-2" @onclick='() => Navigation.NavigateTo("/mainpage")'>Voltar ao Início</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string FeatureName { get; set; } = string.Empty;
+    private string Title { get; set; } = "Módulo";
+    private string Description { get; set; } = "Área operacional do Ninx ERP.";
+    private string SectionName { get; set; } = "Módulo";
+    private bool HasPermission { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        ConfigurePage();
+        HasPermission = ResolvePermission();
+    }
+
+    private void ConfigurePage()
+    {
+        switch (FeatureName.ToLower())
+        {
+            case "produtos":
+                Title = "Produtos e Estoque";
+                SectionName = "Cadastro";
+                Description = "Cadastre produtos e acompanhe quantidades em estoque.";
+                break;
+            case "clientes":
+                Title = "Meus Clientes";
+                SectionName = "Relacionamento";
+                Description = "Consulte e organize a base de clientes do comércio.";
+                break;
+            case "relatorios":
+                Title = "Relatórios e Gráficos";
+                SectionName = "Gerência";
+                Description = "Acompanhe indicadores, gráficos e relatórios de desempenho.";
+                break;
+            case "assinatura":
+                Title = "Minha Assinatura";
+                SectionName = "Gerência";
+                Description = "Visualize status do plano, renovação e informações de pagamento.";
+                break;
+            case "gestao":
+                Title = "Central de Gestão";
+                SectionName = "Gerência";
+                Description = "Controle usuários, categorias e configurações do comércio.";
+                break;
+            case "admin":
+                Title = "Painel Administrativo";
+                SectionName = "Administração";
+                Description = "Configurações globais do sistema Ninx.";
+                break;
+            default:
+                Title = "Módulo";
+                SectionName = "Operação";
+                Description = "Área operacional do sistema.";
+                break;
+        }
+    }
+
+    private bool ResolvePermission()
+    {
+        // Admin acessa tudo
+        if (Session.IsAdmin) return true;
+
+        // Gerente acessa relatórios, assinatura e gestão
+        if (Session.IsManager)
+        {
+            return FeatureName.ToLower() is "relatorios" or "assinatura" or "gestao" or "produtos" or "clientes";
+        }
+
+        // Funcionário acessa apenas o básico
+        return FeatureName.ToLower() is "produtos" or "clientes";
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/mainpage");
+    }
+}

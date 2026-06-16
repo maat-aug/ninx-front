@@ -1,0 +1,1010 @@
+@page "/mainpage/venda"
+@using NinxERP.Domain.DTOs
+@using NinxERP.Domain.Interfaces
+@using NinxERP.Domain.Entities
+@inject IVendaService VendaService
+@inject UserSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Venda — Ninx</PageTitle>
+
+<div class="venda-modern-container" @onclick="FocarInput">
+    @if (!Session.IsAuthenticated)
+    {
+        <div class="auth-guard">
+            <p>Acesso negado. Redirecionando...</p>
+        </div>
+    }
+    else
+    {
+        <div class="venda-single-layout">
+            @* ============================================================
+               ETAPA 1 — PRODUTOS (tela principal com carrinho)
+               ============================================================ *@
+            @if (etapaAtual == 1)
+            {
+                <div class="venda-main-full">
+                    <div class="venda-card search-card">
+                        <div class="search-wrapper">
+                            <i class="bi bi-upc-scan scan-icon"></i>
+                            <input type="text"
+                                   @ref="inputBuscaProduto"
+                                   @bind="codigoBarrasInput"
+                                   @bind:event="oninput"
+                                   @onkeyup="HandleKeyUp"
+                                   placeholder="Escaneie ou digite o código..."
+                                   class="input-scan" />
+                            @if (isBuscandoProduto)
+                            {
+                                <div class="spinner-border spinner-border-sm text-primary ms-2" role="status"></div>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(mensagemErro))
+                        {
+                            <div class="alert-venda error">
+                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErro
+                            </div>
+                        }
+                    </div>
+
+                    <div class="venda-card cart-card">
+                        <div class="cart-header">
+                            <div class="cart-title-group">
+                                <h3><i class="bi bi-cart3"></i> Itens da Venda</h3>
+                                <div class="cart-summary-inline">
+                                    @{
+                                        var totalItens = carrinho.Sum(x => x.Quantidade);
+                                    }
+                                    <div class="checkout-summary-info">
+                                        <span class="badge bg-primary">@totalItens @(totalItens == 1 ? "item" : "itens")</span>
+                                        <span class="total-price-inline">R$ @totalVenda.ToString("N2")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cart-items-container">
+                            @if (carrinho.Count == 0)
+                            {
+                                <div class="empty-cart-v2">
+                                    <div class="empty-icon-wrapper">
+                                        <i class="bi bi-basket2"></i>
+                                    </div>
+                                    <h4>Carrinho Vazio</h4>
+                                    <p>Comece a escanear os produtos para iniciar a venda.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <table class="table table-hover align-middle tabela-venda-dark">
+                                    <thead>
+                                        <tr>
+                                            <th>Produto</th>
+                                            <th class="text-center">Qtd</th>
+                                            <th class="text-end">Unitário</th>
+                                            <th class="text-end">Subtotal</th>
+                                            <th class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in carrinho)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="product-name">@item.NomeProduto</div>
+                                                    <small class="product-unit">@item.UnidadeMedida</small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="qty-control">
+                                                        <button @onclick="() => DecrementarQuantidade(item.ProdutoID)" class="btn-qty">-</button>
+                                                        <input type="number"
+                                                               class="qty-input"
+                                                               value="@item.Quantidade"
+                                                               @onchange="(e) => AtualizarQuantidadeDigitada(item.ProdutoID, e.Value)" />
+                                                        <button @onclick="() => IncrementarQuantidade(item.ProdutoID)" class="btn-qty">+</button>
+                                                    </div>
+                                                </td>
+                                                <td class="text-end">R$ @item.PrecoUnitario.ToString("F2")</td>
+                                                <td class="text-end fw-bold">R$ @item.Subtotal.ToString("F2")</td>
+                                                <td class="text-center">
+                                                    <button @onclick="() => RemoverItem(item.ProdutoID)" class="btn-remove-item-v2">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                        <div class="cart-footer-actions">
+                            <button @onclick="AvancarParaTipoVenda"
+                                    disabled="@(carrinho.Count == 0)"
+                                    class="btn-action primary btn-lg-wide">
+                                CONTINUAR PARA PAGAMENTO <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* ============================================================
+               ETAPAS 2, 3 e 4 — PAGAMENTO (tela de checkout unificada)
+               ============================================================ *@
+            else
+            {
+                <div class="venda-main-full">
+                    <div class="venda-card checkout-unified-card">
+                        
+                        <div class="checkout-header">
+                            <div class="checkout-title">
+                                <h3><i class="bi bi-credit-card"></i> Finalizar Venda</h3>
+                                <div class="checkout-summary-info">
+                                    <span class="badge bg-primary">@carrinho.Sum(x => x.Quantidade) itens</span>
+                                    <span class="total-price-inline">Total: R$ @totalVenda.ToString("N2")</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensagemErro))
+                        {
+                            <div class="alert-venda error mb-3">
+                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErro
+                            </div>
+                        }
+
+                        @* ---- ETAPA 2: TIPO DE VENDA ---- *@
+                        @if (etapaAtual == 2)
+                        {
+                            <div class="checkout-step-content">
+                                <p class="step-label">Selecione o Tipo de Venda</p>
+                                <div class="payment-methods grid-2">
+                                    <button @onclick="() => SelecionarTipoVenda(1)"
+                                            class="method-btn large @(tipoVendaSelecionado == 1 ? "active" : "")">
+                                        <i class="bi bi-bag-check"></i>
+                                        <span>VENDA NORMAL</span>
+                                    </button>
+                                    <button @onclick="() => SelecionarTipoVenda(2)"
+                                            class="method-btn large @(tipoVendaSelecionado == 2 ? "active" : "")">
+                                        <i class="bi bi-person-badge"></i>
+                                        <span>VENDA FIADO</span>
+                                    </button>
+                                </div>
+
+                                @if (tipoVendaSelecionado == 2)
+                                {
+                                    <div class="payment-block mt-4">
+                                        <p class="payment-method-label"><i class="bi bi-person-search"></i> Selecione o Cliente</p>
+                                        <div class="payment-field-row mt-2">
+                                            <input type="text" @bind="buscaClienteInput" @onkeyup="BuscarClientes"
+                                                   class="form-control form-control-lg" placeholder="Digite o nome do cliente para buscar..." />
+                                        </div>
+                                        @if (clientesEncontrados.Count > 0)
+                                        {
+                                            <div class="client-results-container mt-1">
+                                                @foreach (var cliente in clientesEncontrados)
+                                                {
+                                                    <div class="client-item" @onclick="() => SelecionarCliente(cliente)">
+                                                        @cliente.Nome
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        @if (clienteSelecionado != null)
+                                        {
+                                            <div class="selected-client mt-2 animate-fade-in">
+                                                <i class="bi bi-check-circle-fill text-success"></i>
+                                                <span>Cliente selecionado: <strong>@clienteSelecionado.Nome</strong></span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="checkout-footer-actions mt-auto pt-4">
+                                    <button @onclick="VoltarParaCarrinho" class="btn-action secondary"><i class="bi bi-chevron-left"></i>VOLTAR AO CARRINHO</button>
+                                    <button @onclick="AvancarParaMetodoPagamento"
+                                            disabled="@(!PodeAvancarDoTipoVenda())"
+                                            class="btn-action primary">
+                                        PRÓXIMO PASSO <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        @* ---- ETAPA 3: MÉTODO DE PAGAMENTO ---- *@
+                        else if (etapaAtual == 3)
+                        {
+                            <div class="checkout-step-content">
+                                <p class="step-label">Selecione o Método de Pagamento</p>
+                                <div class="payment-methods grid-3">
+                                    <button @onclick='() => SelecionarMetodoPagamento(2)'
+                                            class="method-btn @(metodoPagamentoSelecionado == 2 ? "active" : "")">
+                                        <i class="bi bi-qr-code"></i> PIX
+                                    </button>
+                                    <button @onclick='() => SelecionarMetodoPagamento(3)'
+                                            class='method-btn @(metodoPagamentoSelecionado == 3 ? "active" : "")'>
+                                        <i class="bi bi-credit-card"></i> CARTÃO
+                                    </button>
+                                    <button @onclick='() => SelecionarMetodoPagamento(1)'
+                                            class="method-btn @(metodoPagamentoSelecionado == 1 ? "active" : "")">
+                                        <i class="bi bi-cash-stack"></i> DINHEIRO
+                                    </button>
+                                </div>
+
+                                @* Detalhes do Pagamento Redesenhados *@
+                                <div class="payment-details-area mt-4 animate-fade-in">
+                                    @if (metodoPagamentoSelecionado != 0)
+                                    {
+                                        <div class="payment-summary-card">
+                                            <div class="summary-item main">
+                                                <span class="label">Total da Venda</span>
+                                                <span class="value">R$ @totalVenda.ToString("N2")</span>
+                                            </div>
+                                            
+                                            @if (metodoPagamentoSelecionado == 1 || tipoVendaSelecionado == 2)
+                                            {
+                                                <div class="summary-divider"></div>
+                                                <div class="summary-item input-mode">
+                                                    <span class="label">Valor Recebido</span>
+                                                    <div class="value-input-wrapper">
+                                                        <span class="prefix">R$</span>
+            
+                                                        @if (metodoPagamentoSelecionado == 1)
+                                                        {
+                                                            <input type="text"
+                                                                   @ref="inputValorDinheiro"
+                                                                   @bind="valorRecebidoFormatado"
+                                                                   @oninput="FormatarInputDinheiro"
+                                                                   @onfocus="FocarFinalDinheiro"
+                                                                   @onclick="FocarFinalDinheiro"
+                                                                   class="clean-input"
+                                                                   placeholder="0,00" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <input type="text"
+                                                                   @ref="inputValorFiado"
+                                                                   @bind="valorRecebidoFormatadoFiado"
+                                                                   @oninput="FormatarInputFiado"
+                                                                   @onfocus="FocarFinalFiado"
+                                                                   @onclick="FocarFinalFiado"
+                                                                   class="clean-input"
+                                                                   placeholder="0,00" />
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            <div class="summary-divider"></div>
+                                            
+                                            @if (tipoVendaSelecionado == 1)
+                                            {
+                                                <div class="summary-item highlight @(troco > 0 ? "success" : "")">
+                                                    <span class="label">Troco</span>
+                                                    <span class="value">R$ @FormatarNumero(troco)</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="summary-item highlight @(valorRecebido >= totalVenda ? "error" : "warning")">
+                                                    <span class="label">Quantia Faltante</span>
+                                                    <span class="value">
+                                                        @if (valorRecebido >= totalVenda) { <span>Valor Inválido</span> }
+                                                        else { <span>R$ @FormatarNumero(totalVenda - valorRecebido)</span> }
+                                                    </span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="checkout-footer-actions mt-auto pt-4">
+                                    <button @onclick="VoltarParaTipoVenda" class="btn-action secondary">VOLTAR</button>
+                                    <button @onclick="ConfirmarPagamento"
+                                            disabled="@(!PodeProsseguir())"    
+                                            class="btn-action success btn-lg-wide">
+                                        FINALIZAR VENDA <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        @* ---- ETAPA 4: QR CODE ---- *@
+                        else if (etapaAtual == 4)
+                        {
+                            <div class="checkout-step-content text-center">
+                                <div class="qr-container-large">
+                                    <h4>Assinatura do Documento</h4>
+                                    <p class="text-muted">Peça ao cliente para escanear o código abaixo para assinar a venda fiada.</p>
+                                    
+                                    @if (isGerandoQRCode)
+                                    {
+                                        <div class="py-5"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div></div>
+                                    }
+                                    else if (!string.IsNullOrEmpty(qrCodeDataUrl))
+                                    {
+                                        <div class="qr-wrapper animate-fade-in">
+                                            <img src="@qrCodeDataUrl" class="qr-image-large" />
+                                        </div>
+                                    }
+
+                                    @if (!string.IsNullOrEmpty(mensagemErroQR))
+                                    {
+                                        <div class="alert-venda error mt-3">
+                                            <i class="bi bi-exclamation-triangle-fill" style="align-items:center"></i> @mensagemErroQR
+                                        </div>
+                                    }
+
+                                    <div class="qr-footer-actions mt-5">
+                                        <button @onclick="ValidarEEncerrarVenda"
+                                                disabled="@isValidando"
+                                                class="btn-action success btn-lg-wide">
+                                            @if (isValidando) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                            VERIFICAR ASSINATURA E CONCLUIR
+                                        </button>
+                                        <button @onclick="DesistirDaVenda"
+                                                disabled="@isValidando"
+                                                class="btn-action secondary">
+                                            DESISTIR DA VENDA
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    /* ── Layout raiz ── */
+    .venda-modern-container { padding: 20px; max-width: 1200px; margin: 0 auto; color: #fff; font-family: 'Inter', sans-serif; min-height: 90vh; display: flex; flex-direction: column; }
+    
+    .venda-single-layout { width: 100%; flex: 1; display: flex; flex-direction: column; }
+    .venda-main-full { width: 100%; flex: 1; display: flex; flex-direction: column; animation: fadeInUp 0.4s ease-out; }
+
+    /* ── Card genérico ── */
+    .venda-card { background: rgba(255,255,255,0.05); border-radius: 24px; padding: 28px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px); box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
+
+    /* ── Cabeçalho do Carrinho ── */
+    .cart-header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px; }
+    .cart-title-group { display: flex; align-items: center; justify-content: space-between; }
+    .cart-title-group h3 { margin: 0; font-weight: 700; display: flex; align-items: center; gap: 12px; font-size: 1.5rem; }
+    .cart-summary-inline { display: flex; align-items: center; gap: 20px; }
+    .total-price-inline { font-size: 1.8rem; font-weight: 800; color: #007bff; text-shadow: 0 0 20px rgba(0,123,255,0.2); }
+
+    /* ── Busca ── */
+    .search-card { margin-bottom: 24px; }
+    .search-wrapper { display: flex; align-items: center; background: rgba(0,0,0,0.4); border-radius: 16px; padding: 14px 24px; border: 2px solid rgba(255,255,255,0.05); transition: 0.3s; }
+    .search-wrapper:focus-within { border-color: #007bff; background: rgba(0,0,0,0.5); box-shadow: 0 0 25px rgba(0,123,255,0.2); }
+    .scan-icon { font-size: 1.8rem; color: #007bff; margin-right: 15px; }
+    .input-scan { background: transparent; border: none; color: #fff; font-size: 1.3rem; width: 100%; outline: none; font-weight: 500; }
+
+    /* ── Carrinho Vazio ── */
+    .empty-cart-v2 { text-align: center; padding: 80px 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; color: rgba(255,255,255,0.4); }
+    .empty-icon-wrapper { width: 100px; height: 100px; background: rgba(255,255,255,0.03); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+    .empty-icon-wrapper i { font-size: 3.5rem; }
+    .empty-cart-v2 h4 { color: #fff; margin: 0; font-weight: 700; }
+    .empty-cart-v2 p { margin: 0; font-size: 1.1rem; }
+
+    /* ── Carrinho Tabela ── */
+    .cart-card { min-height: 500px; flex: 1; display: flex; flex-direction: column; }
+    .cart-items-container { flex: 1; overflow-y: auto; margin-bottom: 20px; max-height: 50vh; }
+    .btn-remove-item-v2 { background: rgba(220,53,69,0.1); border: 1px solid rgba(220,53,69,0.2); color: #dc3545; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer; margin: 0 auto; }
+    .btn-remove-item-v2:hover { background: #dc3545; color: #fff; transform: scale(1.1); }
+    .cart-footer-actions { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px; display: flex; justify-content: center; }
+
+    /* ── Checkout Unificado ── */
+    .checkout-unified-card { min-height: 600px; flex: 1; display: flex; flex-direction: column; }
+    .checkout-header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 30px; }
+    .checkout-title { display: flex; align-items: center; justify-content: space-between; }
+    .total-price-highlight { font-size: 1.6rem; font-weight: 800; color: #28a745; text-shadow: 0 0 20px rgba(40,167,69,0.2); }
+    .checkout-step-content { flex: 1; display: flex; flex-direction: column; animation: fadeIn 0.3s ease-in; }
+
+    /* ── Métodos e Botões ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .method-btn { background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); color: #fff; padding: 24px; border-radius: 20px; cursor: pointer; transition: 0.3s; font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .method-btn.large { padding: 50px 20px; }
+    .method-btn i { font-size: 2.2rem; }
+    .method-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3); transform: translateY(-3px); }
+    .method-btn.active { background: rgba(0,123,255,0.1); border-color: #007bff; box-shadow: 0 10px 30px rgba(0,123,255,0.2); }
+
+    .btn-action { padding: 16px 32px; border-radius: 14px; border: none; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 10px; }
+    .btn-lg-wide { padding: 20px 80px; font-size: 1.15rem; }
+    .btn-action.primary { background: #007bff; color: #fff; }
+    .btn-action.primary:hover:not(:disabled) { background: #0056b3; box-shadow: 0 10px 30px rgba(0,123,255,0.3); }
+    .btn-action.secondary { background: rgba(255,255,255,0.08); color: #fff; }
+    .btn-action.success { background: #28a745; color: #fff; }
+    .btn-action.success:hover:not(:disabled) { background: #1e7e34; box-shadow: 0 10px 30px rgba(40,167,69,0.3); }
+    
+    .checkout-footer-actions { display: flex; justify-content: space-between; align-items: center; }
+
+    /* ── Clientes e Rolagem ── */
+    .client-results-container { background: rgba(0,0,0,0.3); border-radius: 14px; max-height: 180px; overflow-y: auto; border: 1px solid rgba(0,123,255,0.2); margin-top: 8px; }
+    .client-item { padding: 14px 20px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: 0.2s; font-weight: 500; }
+    .client-item:hover { background: rgba(0,123,255,0.1); padding-left: 25px; }
+    .selected-client { background: rgba(40,167,69,0.1); border: 1px solid rgba(40,167,69,0.2); border-radius: 12px; padding: 15px 20px; color: #28a745; display: flex; align-items: center; gap: 12px; font-size: 1.1rem; }
+
+    /* ── Resumo de Pagamento Redesenhado ── */
+    .payment-summary-card { background: rgba(0,0,0,0.25); border-radius: 20px; padding: 24px; border: 1px solid rgba(255,255,255,0.05); }
+    .summary-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; }
+    .summary-item.main .label { font-size: 1.1rem; color: rgba(255,255,255,0.6); }
+    .summary-item.main .value { font-size: 1.8rem; font-weight: 800; }
+    .summary-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0; }
+    .summary-item .label { font-weight: 600; color: rgba(255,255,255,0.5); }
+    .summary-item .value { font-weight: 700; font-size: 1.3rem; }
+    
+    .summary-item.input-mode { padding: 15px 0; }
+    .value-input-wrapper { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 10px 20px; border-radius: 12px; border: 2px solid rgba(0,123,255,0.3); }
+    .value-input-wrapper .prefix { font-weight: 800; color: #007bff; font-size: 1.2rem; }
+    .clean-input { background: transparent; border: none; color: #fff; font-size: 1.4rem; font-weight: 700; outline: none; width: 150px; text-align: right; }
+    
+    .summary-item.highlight { padding: 20px; border-radius: 14px; background: rgba(255,255,255,0.03); margin-top: 10px; }
+    .summary-item.highlight.success { background: rgba(40,167,69,0.1); border: 1px solid rgba(40,167,69,0.2); }
+    .summary-item.highlight.success .value { color: #28a745; }
+    .summary-item.highlight.warning .value { color: #ffc107; }
+    .summary-item.highlight.error { background: rgba(220,53,69,0.1); border: 1px solid rgba(220,53,69,0.2); }
+    .summary-item.highlight.error .value { color: #dc3545; }
+
+    /* ── Qty Control ── */
+    .qty-control { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn-qty { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; transition: 0.2s; font-weight: 700; }
+    .btn-qty:hover { background: #007bff; border-color: #007bff; transform: scale(1.1); }
+    .qty-input { width: 65px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; text-align: center; border-radius: 10px; padding: 8px; font-weight: 700; font-size: 1rem; }
+
+    /* ── QR Code ── */
+    .qr-container-large { max-width: 500px; margin: 0 auto; }
+    .qr-wrapper { background: #fff; padding: 25px; border-radius: 24px; display: inline-block; margin: 30px 0; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+    .qr-image-large { width: 280px; height: 280px; }
+
+    /* ── Misc ── */
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    @@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Custom scrollbar */
+    *::-webkit-scrollbar { width: 8px; }
+    *::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+    *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+    .qr-footer-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-top: 3rem;
+    }
+
+    .qr-footer-actions .btn-lg-wide {
+        width: 100%;
+        max-width: 400px;
+        justify-content: center;
+    }
+
+    .qr-footer-actions .btn-action.secondary {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.95rem;
+        font-weight: 500;
+        padding: 8px 16px;
+    }
+
+    .qr-footer-actions .btn-action.secondary:hover {
+        color: #dc3545; 
+        text-decoration: underline;
+        background: transparent;
+    }
+
+    .checkout-summary-info {
+        display: flex;
+        flex-direction: column; /* Alinha os itens verticalmente */
+        align-items: flex-end; /* Alinha os blocos à direita (opcional, para combinar com o fluxo da tela) */
+        gap: 6px; /* Espaçamento sutil entre o total e os itens */
+    }
+
+    /* Estilização da caixa de alerta de erro */
+    .alert-venda.error {
+        text-align: center;
+        justify-content: center;
+        background-color: rgba(220, 53, 69, 0.15); /* Fundo vermelho bem sutil e moderno */
+        border: 1px solid rgba(220, 53, 69, 0.4); /* Borda vermelha para dar definição */
+        color: #ff6b7d; /* Texto em um tom de vermelho vivo e legível */
+        padding: 14px 20px;
+        border-radius: 12px;
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px; /* Espaço entre o ícone e o texto */
+        font-weight: 500;
+        font-size: 0.95rem;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .alert-venda.error i {
+        color: #dc3545;
+        font-size: 1.2rem;
+    }
+
+    /* Aplica o estilo para qualquer botão que tenha o atributo 'disabled' */
+    .btn-action:disabled,
+    button:disabled {
+        opacity: 0.5;                /* Deixa o botão bem mais apagado/opaco */
+        cursor: not-allowed;         /* Altera o cursor do mouse para o sinal de "bloqueado" */
+        pointer-events: none;        /* Garante que nenhum efeito de hover ou clique funcione */
+        box-shadow: none !important; /* Remove sombras que possam dar efeito de profundidade */
+    }
+
+    .btn-action.secondary:disabled {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        color: rgba(255, 255, 255, 0.3) !important;
+    }
+</style>
+
+@code {
+    private ElementReference inputBuscaProduto;
+    private ElementReference inputValorDinheiro;
+    private ElementReference inputValorFiado;
+
+    private int etapaAtual = 1;
+    private List<ItemVendaDTO> carrinho = new();
+    private decimal totalVenda;
+    private string codigoBarrasInput = string.Empty;
+    private string mensagemErro = string.Empty;
+    private string mensagemErroQR = string.Empty;
+    private bool isBuscandoProduto = false;
+
+    private int tipoVendaSelecionado = 0;
+    private int metodoPagamentoSelecionado;
+
+    private decimal valorRecebido;
+    private string valorRecebidoFormatado = "0,00";
+    private string valorRecebidoFormatadoFiado = "0,00";
+    private decimal troco = 0;
+
+    private string buscaClienteInput = string.Empty;
+    private List<ClienteDTO> clientesEncontrados = new();
+    private ClienteDTO? clienteSelecionado = null;
+
+    private string qrCodeDataUrl = string.Empty;
+    private Guid documentoGuidAtual = Guid.Empty;
+    private bool isGerandoQRCode = false;
+    private bool isValidando = false;
+    private int vendaIdAtual = 0;
+
+    private System.Timers.Timer? debounceTimer;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || etapaAtual == 1)
+            await FocarInput();
+    }
+
+    private async Task FocarInput()
+    {
+        try 
+        { 
+            if (etapaAtual == 1)
+                await inputBuscaProduto.FocusAsync(); 
+        } 
+        catch { }
+    }
+
+    private async Task FocarFinalDinheiro()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval",
+                "setTimeout(function(){ var el = document.activeElement; if(el && el.tagName==='INPUT'){ el.setSelectionRange(el.value.length, el.value.length); } }, 0)");
+        }
+        catch { }
+    }
+
+    private async Task FocarFinalFiado()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval",
+                "setTimeout(function(){ var el = document.activeElement; if(el && el.tagName==='INPUT'){ el.setSelectionRange(el.value.length, el.value.length); } }, 0)");
+        }
+        catch { }
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            debounceTimer?.Stop();
+            _ = BuscarEAdicionarProduto();
+            return;
+        }
+        debounceTimer?.Stop();
+        debounceTimer = new System.Timers.Timer(500);
+        debounceTimer.Elapsed += async (s, ev) =>
+        {
+            debounceTimer!.Stop();
+            await InvokeAsync(BuscarEAdicionarProduto);
+        };
+        debounceTimer.Start();
+    }
+
+    private async Task BuscarEAdicionarProduto()
+    {
+        if (string.IsNullOrWhiteSpace(codigoBarrasInput) || isBuscandoProduto) return;
+
+        isBuscandoProduto = true;
+        mensagemErro = string.Empty;
+        StateHasChanged();
+
+        var produto = await VendaService.GetProdutoPorCodigoBarrasAsync(codigoBarrasInput);
+
+        if (produto != null)
+        {
+            var itemExistente = carrinho.FirstOrDefault(x => x.ProdutoID == produto.ProdutoID);
+            if (itemExistente != null)
+                itemExistente.Quantidade++;
+            else
+                carrinho.Add(new ItemVendaDTO
+                {
+                    ProdutoID     = produto.ProdutoID,
+                    NomeProduto   = produto.Nome,
+                    PrecoUnitario = produto.PrecoVenda,
+                    UnidadeMedida = produto.UnidadeMedida,
+                    ComercioId    = Session.CurrentCommerceId != null ? int.Parse(Session.CurrentCommerceId) : 0,
+                    Quantidade    = 1
+                });
+
+            AtualizarTotalVenda();
+            codigoBarrasInput = string.Empty;
+        }
+        else
+        {
+            mensagemErro = "Produto não encontrado";
+            codigoBarrasInput = string.Empty;
+        }
+
+        isBuscandoProduto = false;
+        StateHasChanged();
+        await FocarInput();
+    }
+
+    private void IncrementarQuantidade(int produtoId)
+    {
+        var item = carrinho.FirstOrDefault(x => x.ProdutoID == produtoId);
+        if (item != null) { item.Quantidade++; AtualizarTotalVenda(); }
+    }
+
+    private void DecrementarQuantidade(int produtoId)
+    {
+        var item = carrinho.FirstOrDefault(x => x.ProdutoID == produtoId);
+        if (item != null && item.Quantidade > 1) { item.Quantidade--; AtualizarTotalVenda(); }
+    }
+
+    private void RemoverItem(int produtoId)
+    {
+        carrinho.RemoveAll(x => x.ProdutoID == produtoId);
+        AtualizarTotalVenda();
+        _ = FocarInput();
+    }
+
+    private void AtualizarTotalVenda() => totalVenda = carrinho.Sum(x => x.Subtotal);
+
+    private void AtualizarQuantidadeDigitada(int produtoId, object novoValor)
+    {
+        if (int.TryParse(novoValor?.ToString(), out int qtd) && qtd > 0)
+        {
+            var item = carrinho.FirstOrDefault(x => x.ProdutoID == produtoId);
+            if (item != null) { item.Quantidade = qtd; AtualizarTotalVenda(); StateHasChanged(); }
+        }
+    }
+
+    private void AvancarParaTipoVenda()
+    {
+        tipoVendaSelecionado   = 0;
+        clienteSelecionado     = null;
+        buscaClienteInput      = string.Empty;
+        clientesEncontrados.Clear();
+        mensagemErro           = string.Empty;
+        etapaAtual             = 2;
+    }
+
+    private void AvancarParaMetodoPagamento()
+    {
+        metodoPagamentoSelecionado = 0;
+        valorRecebido                 = 0;
+        valorRecebidoFormatado        = "0,00";
+        valorRecebidoFormatadoFiado   = "0,00";
+        troco                         = 0;
+        mensagemErro                  = string.Empty;
+        etapaAtual                    = 3;
+    }
+
+    private void VoltarParaCarrinho()
+    {
+        tipoVendaSelecionado        = 0;
+        metodoPagamentoSelecionado  = 0;
+        mensagemErro                = string.Empty;
+        etapaAtual                  = 1;
+    }
+
+    private void VoltarParaTipoVenda()
+    {
+        metodoPagamentoSelecionado    = 0;
+        valorRecebido                 = 0;
+        valorRecebidoFormatado        = "0,00";
+        valorRecebidoFormatadoFiado   = "0,00";
+        troco                         = 0;
+        mensagemErro                  = string.Empty;
+        etapaAtual                    = 2;
+    }
+
+    private void SelecionarTipoVenda(int tipo)
+    {
+        tipoVendaSelecionado = tipoVendaSelecionado == tipo ? 0 : tipo;
+        if (tipoVendaSelecionado == 1)
+        {
+            clienteSelecionado = null;
+            buscaClienteInput  = string.Empty;
+            clientesEncontrados.Clear();
+        }
+        mensagemErro = string.Empty;
+    }
+
+    private void SelecionarMetodoPagamento(int metodo)
+    {
+        metodoPagamentoSelecionado  = metodoPagamentoSelecionado == metodo ? 0 : metodo;
+        valorRecebido               = 0;
+        valorRecebidoFormatado      = "0,00";
+        valorRecebidoFormatadoFiado = "0,00";
+        troco                       = 0;
+        mensagemErro                = string.Empty;
+    }
+
+    private bool PodeAvancarDoTipoVenda()
+    {
+        if (tipoVendaSelecionado == 1) return true;
+        if (tipoVendaSelecionado == 2) return clienteSelecionado != null;
+        return false;
+    }
+
+    private bool PodeProsseguir()
+    {
+        if (metodoPagamentoSelecionado == 0) return false;
+
+        bool normal = tipoVendaSelecionado == 1;
+        bool fiado  = tipoVendaSelecionado == 2;
+
+        if (normal)
+        {
+            if (metodoPagamentoSelecionado == 1) return valorRecebido >= totalVenda;
+            return true;
+        }
+
+        if (fiado)
+        {
+            return valorRecebido < totalVenda;
+        }
+
+        return false;
+    }
+
+    private async Task ConfirmarPagamento()
+    {
+        mensagemErro = string.Empty;
+
+        decimal valorPagamento = tipoVendaSelecionado == 1 ? totalVenda : valorRecebido;
+
+        var vendaRequest = new VendaRequestDTO
+        {
+            ComercioID  = Session.CurrentCommerceId != null ? int.Parse(Session.CurrentCommerceId) : 0,
+            UsuarioID   = Session.CurrentUser?.Id ?? 0,
+            ClienteID   = clienteSelecionado?.clienteID ?? 0,
+            TipoVenda   = tipoVendaSelecionado,
+            ItensVenda  = carrinho,
+            Pagamentos  = new List<PagamentoDTO>
+            {
+                new PagamentoDTO
+                {
+                    FormaPagamento = metodoPagamentoSelecionado,
+                    Valor          = valorPagamento
+                }
+            }
+        };
+
+        var vendaResponse = await VendaService.RealizarVendaAsync(vendaRequest);
+
+        if (vendaResponse != null)
+        {
+            vendaIdAtual = vendaResponse.VendaID;
+            documentoGuidAtual = vendaResponse.DocumentoGuid;
+
+            if (tipoVendaSelecionado == 2)
+            {
+                await GerarQRCode(vendaResponse.DocumentoGuid);
+                etapaAtual = 4;
+            }
+            else
+            {
+                await FinalizarVendaSemAssinatura();
+            }
+        }
+        else
+        {
+            mensagemErro = "Erro ao processar a venda. Tente novamente.";
+        }
+    }
+
+    private async Task FinalizarVendaSemAssinatura()
+    {
+        LimparDadosVenda();
+        etapaAtual   = 1;
+        mensagemErro = string.Empty;
+        await FocarInput();
+    }
+
+    private async Task GerarQRCode(Guid documentoGuid)
+    {
+        isGerandoQRCode = true;
+        mensagemErroQR = string.Empty;
+        
+        string urlSignaturePage = "https://seudominio.com/urlSignaturePage"; 
+        string linkFinal = $"{urlSignaturePage}/documento/{documentoGuid}";
+        
+        qrCodeDataUrl = GerarQRCodeDataUrl(linkFinal);
+        
+        isGerandoQRCode = false;
+        await Task.CompletedTask;
+    }
+
+    private string GerarQRCodeDataUrl(string link)
+    {
+        try
+        {
+            var qrGenerator = new QRCoder.QRCodeGenerator();
+            var qrCodeData  = qrGenerator.CreateQrCode(link, QRCoder.QRCodeGenerator.ECCLevel.Q);
+            var qrCode      = new QRCoder.PngByteQRCode(qrCodeData);
+            var qrCodeImage = qrCode.GetGraphic(20);
+            return "data:image/png;base64," + Convert.ToBase64String(qrCodeImage);
+        }
+        catch { return string.Empty; }
+    }
+
+    private async Task ValidarEEncerrarVenda()
+    {
+        isValidando = true;
+        mensagemErroQR = string.Empty;
+        StateHasChanged();
+
+        var isAssinado = await VendaService.VerificarDocumentoAssinadoAsync(documentoGuidAtual);
+
+        if (isAssinado)
+        {
+            LimparDadosVenda();
+            etapaAtual   = 1;
+            mensagemErro = string.Empty;
+            await FocarInput();
+        }
+        else
+        {
+            mensagemErroQR = "Assinatura não finalizada.";
+        }
+
+        isValidando = false;
+        StateHasChanged();
+    }
+
+    private async Task DesistirDaVenda()
+    {
+        isValidando = true;
+        mensagemErroQR = string.Empty;
+        StateHasChanged();
+
+        var sucesso = await VendaService.DesistirVendaAsync(vendaIdAtual);
+
+        if (sucesso)
+        {
+            LimparDadosVenda();
+            etapaAtual   = 1;
+            mensagemErro = string.Empty;
+            await FocarInput();
+        }
+        else
+        {
+            mensagemErroQR = "Erro ao desistir da venda. Tente novamente.";
+        }
+
+        isValidando = false;
+        StateHasChanged();
+    }
+
+    private async Task BuscarClientes()
+    {
+        if (buscaClienteInput.Length >= 3)
+            clientesEncontrados = await VendaService.BuscarClientesAsync(buscaClienteInput);
+        else
+            clientesEncontrados.Clear();
+    }
+
+    private void SelecionarCliente(ClienteDTO cliente)
+    {
+        clienteSelecionado = cliente;
+        buscaClienteInput = cliente.Nome;
+        clientesEncontrados.Clear();
+    }
+
+    private void FormatarInputDinheiro(ChangeEventArgs e)
+    {
+        valorRecebidoFormatado = FormatarInputEmTempoReal(e.Value?.ToString() ?? string.Empty);
+        valorRecebido          = ParseDecimal(valorRecebidoFormatado);
+        CalcularTroco();
+        StateHasChanged();
+    }
+
+    private void FormatarInputFiado(ChangeEventArgs e)
+    {
+        valorRecebidoFormatadoFiado = FormatarInputEmTempoReal(e.Value?.ToString() ?? string.Empty);
+        valorRecebido               = ParseDecimal(valorRecebidoFormatadoFiado);
+        StateHasChanged();
+    }
+
+    private void CalcularTroco()
+    {
+        troco = valorRecebido - totalVenda;
+        if (troco < 0) troco = 0;
+    }
+
+    private string FormatarInputEmTempoReal(string input)
+    {
+        string digits = System.Text.RegularExpressions.Regex.Replace(input, @"[^\d]", "");
+        digits = digits.PadLeft(1, '0');
+        if (digits.Length > 10) digits = digits.Substring(0, 10);
+
+        if (digits.Length <= 2)
+            return "0," + digits.PadLeft(2, '0');
+
+        int    pos     = digits.Length - 2;
+        string intPart = digits.Substring(0, pos);
+        string decPart = digits.Substring(pos);
+        intPart = int.Parse(intPart)
+                     .ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))
+                     .Replace(".", "");
+        return intPart + "," + decPart;
+    }
+
+    private decimal ParseDecimal(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return 0;
+        var v = valor.Replace(",", ".");
+        return decimal.TryParse(v, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out decimal r) ? r : 0;
+    }
+
+    private string FormatarNumero(decimal valor) =>
+        valor.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+
+    private void LimparDadosVenda()
+    {
+        carrinho.Clear();
+        totalVenda = 0;
+        codigoBarrasInput = string.Empty;
+        tipoVendaSelecionado = 0;
+        metodoPagamentoSelecionado = 0;
+        valorRecebido = 0;
+        valorRecebidoFormatado = "0,00";
+        valorRecebidoFormatadoFiado = "0,00";
+        troco = 0;
+        buscaClienteInput = string.Empty;
+        clientesEncontrados.Clear();
+        clienteSelecionado = null;
+        qrCodeDataUrl = string.Empty;
+        documentoGuidAtual = Guid.Empty;
+        vendaIdAtual = 0;
+        mensagemErro = string.Empty;
+        mensagemErroQR = string.Empty;
+    }
+}
