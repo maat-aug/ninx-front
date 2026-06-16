@@ -1,0 +1,127 @@
+:root {
+    --primary: #1A9E9A;
+    --primary-soft: rgba(26, 158, 154, 0.2);
+    --bg-deep: #060C14;
+    --card-bg: rgba(15, 25, 40, 0.9);
+    --text-muted: #8BA3BC;
+    --text-light: #F0F4F8;
+    --radius: 24px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+}
+
+body {
+    background-color: var(--bg-deep);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--text-light);
+    overflow: hidden;
+}
+
+.icon-sm {
+    width: 16px;
+    height: 16px;
+}
+
+/* Desabilitar estilos padrão do Bootstrap que conflitam */
+.form-control:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 0.2rem rgba(26, 158, 154, 0.25) !important;
+}
+
+.btn-primary {
+    background-color: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+    .btn-primary:hover {
+        background-color: #158581 !important;
+        border-color: #158581 !important;
+    }
+
+input::-ms-reveal,
+input::-ms-clear {
+    display: none;
+}
+
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+}
+
+/* Fundo da tabela e arredondamento das bordas */
+.tabela-venda-dark {
+    background-color: #1e293b !important; /* Tom grafite/azul-escuro */
+    border-color: #334155 !important;
+    border-radius: 8px;
+    overflow: hidden;
+    --bs-table-bg: #1e293b !important; /* Força o Bootstrap a usar essa cor de fundo */
+}
+
+/* Cor do texto do cabeçalho */
+.tabela-venda-dark thead th {
+    background-color: #0f172a !important; /* Cabeçalho ligeiramente mais escuro */
+    color: #94a3b8 !important;
+    font-weight: 600;
+    border-bottom: 2px solid #334155 !important;
+}
+
+/* Cor do texto das linhas */
+.tabela-venda-dark tbody td {
+    color: #f8fafc !important;
+    border-bottom: 1px solid #334155 !important;
+}
+
+/* Ajuste do efeito Hover do Bootstrap para a versão escura */
+.tabela-venda-dark.table-hover > tbody > tr:hover > * {
+    --bs-table-accent-bg: #334155 !important;
+    color: #ffffff !important;
+}
+
+/* Correção do texto da unidade para o modo escuro */
+.qty-input {
+    width: 45px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1rem;
+    outline: none;
+}
+
+/* Remove as setas padrão do input numérico para não quebrar o design */
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.qty-input {
+    -moz-appearance: textfield; /* Firefox */
+}
+
+/* Efeito sutil ao clicar no input para digitar */
+.qty-input:focus {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+/* Ajuste da Unidade (UN) para dar leitura no dark mode e alinhar abaixo do nome */
+.product-unit {
+    color: rgba(255, 255, 255, 0.5) !important; /* Resgata o tom cinza visível */
+    display: block;
+    font-size: 0.8rem;
+    margin-top: 2px;
+}

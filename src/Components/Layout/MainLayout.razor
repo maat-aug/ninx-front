@@ -1,0 +1,24 @@
+@inherits LayoutComponentBase
+@using NinxERP.Domain.Entities
+@using NinxERP.Components.Layout.Shared
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<div class="page">
+    @if (Session.IsAuthenticated && !IsLoginPage)
+    {
+        <NavMenu />
+    }
+    <main>
+        @Body
+    </main>
+</div>
+
+@code {
+    private bool IsLoginPage => Navigation.Uri.EndsWith("/") || Navigation.Uri.EndsWith("/login");
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += (s, e) => StateHasChanged();
+    }
+}
