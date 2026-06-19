@@ -136,7 +136,7 @@
                 <div class="venda-main-full">
                     <div class="venda-card checkout-unified-card">
                         
-                        <div class="checkout-header">
+                        <div class="checkout-header @(etapaAtual == 5 ? "d-none" : "")">
                             <div class="checkout-title">
                                 <h3><i class="bi bi-credit-card"></i> Finalizar Venda</h3>
                                 <div class="checkout-summary-info">
@@ -351,6 +351,34 @@
                                 </div>
                             </div>
                         }
+
+                        @* ---- ETAPA 5: VENDA CONCLUÍDA ---- *@
+                        else if (etapaAtual == 5)
+                        {
+                            <div class="checkout-step-content text-center">
+                                <div class="venda-concluida-container animate-fade-in">
+                                    <div class="success-icon-wrapper">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </div>
+                                    <h2 class="success-title">Venda Concluída!</h2>
+                                    <p class="success-subtitle">A venda foi registrada com sucesso.</p>
+
+                                    <div class="success-total-badge">
+                                        <span class="success-total-label">Total cobrado</span>
+                                        <span class="success-total-value">R$ @totalVendaConcluida.ToString("N2")</span>
+                                    </div>
+
+                                    <div class="success-actions mt-5">
+                                        <button @onclick="RealizarNovaVenda" class="btn-action success btn-lg-wide">
+                                            <i class="bi bi-cart-plus"></i> REALIZAR OUTRA VENDA
+                                        </button>
+                                        <button @onclick="VoltarPaginaPrincipal" class="btn-action secondary">
+                                            <i class="bi bi-house"></i> PÁGINA PRINCIPAL
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -544,6 +572,154 @@
         border-color: rgba(255, 255, 255, 0.1) !important;
         color: rgba(255, 255, 255, 0.3) !important;
     }
+
+    /* ── Tela de Venda Concluída (Etapa 5) ── */
+    .venda-concluida-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; }
+    .success-icon-wrapper { width: 110px; height: 110px; border-radius: 50%; background: rgba(40,167,69,0.15); border: 3px solid rgba(40,167,69,0.4); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; animation: successPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .success-icon-wrapper i { font-size: 3.8rem; color: #28a745; }
+    .success-title { font-size: 2.2rem; font-weight: 800; color: #fff; margin: 0; }
+    .success-subtitle { color: rgba(255,255,255,0.5); font-size: 1.1rem; margin: 0; }
+    .success-total-badge { background: rgba(40,167,69,0.1); border: 1px solid rgba(40,167,69,0.25); border-radius: 20px; padding: 20px 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px; }
+    .success-total-label { font-size: 0.85rem; color: rgba(255,255,255,0.45); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .success-total-value { font-size: 2.4rem; font-weight: 900; color: #28a745; text-shadow: 0 0 20px rgba(40,167,69,0.3); }
+    .success-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 400px; }
+    .success-actions .btn-action { width: 100%; justify-content: center; }
+    .success-actions .btn-action.secondary { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); }
+    @@keyframes successPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ════════════════════════════════════════════
+       RESPONSIVIDADE — telas pequenas de desktop
+       Breakpoints: 1280px · 1024px · 860px · 700px
+       ════════════════════════════════════════════ */
+
+    @@media (max-width: 1280px) {
+        .venda-modern-container { padding: 16px; }
+        .venda-card { padding: 22px; }
+        .total-price-inline { font-size: 1.5rem; }
+        .cart-title-group h3 { font-size: 1.3rem; }
+        .btn-lg-wide { padding: 18px 48px; }
+        .summary-item.main .value { font-size: 1.6rem; }
+        .success-total-value { font-size: 2rem; }
+    }
+
+    @@media (max-width: 1024px) {
+        .venda-card { padding: 18px; border-radius: 18px; }
+
+        /* Cabeçalho do carrinho empilha em telas médias */
+        .cart-title-group { flex-wrap: wrap; gap: 10px; }
+        .cart-title-group h3 { font-size: 1.2rem; }
+        .total-price-inline { font-size: 1.3rem; }
+
+        /* Grids de pagamento: 3 colunas → 2 */
+        .grid-3 { grid-template-columns: 1fr 1fr; }
+
+        /* Botão largo reduz padding */
+        .btn-lg-wide { padding: 16px 32px; font-size: 1rem; }
+
+        /* Tabela: colunas secundárias ficam menores */
+        .tabela-venda-dark th,
+        .tabela-venda-dark td { font-size: 0.9rem; padding: 10px 8px; }
+
+        /* Resumo de pagamento */
+        .summary-item.main .value { font-size: 1.4rem; }
+        .summary-item .value { font-size: 1.1rem; }
+        .clean-input { width: 120px; font-size: 1.2rem; }
+
+        /* QR Code */
+        .qr-image-large { width: 220px; height: 220px; }
+
+        /* Checkout header */
+        .checkout-title { flex-wrap: wrap; gap: 10px; }
+    }
+
+    @@media (max-width: 860px) {
+        .venda-modern-container { padding: 12px; }
+        .venda-card { padding: 14px; border-radius: 14px; }
+
+        /* Busca */
+        .input-scan { font-size: 1.1rem; }
+        .scan-icon { font-size: 1.4rem; margin-right: 10px; }
+        .search-wrapper { padding: 10px 16px; }
+
+        /* Cabeçalho do carrinho empilha verticalmente */
+        .cart-title-group { flex-direction: column; align-items: flex-start; gap: 8px; }
+        .cart-summary-inline { gap: 12px; }
+        .total-price-inline { font-size: 1.2rem; }
+
+        /* Grids: tudo vira 1 coluna */
+        .grid-2 { grid-template-columns: 1fr; gap: 12px; }
+        .grid-3 { grid-template-columns: 1fr; gap: 12px; }
+        .method-btn.large { padding: 28px 20px; }
+        .method-btn { padding: 18px; }
+        .method-btn i { font-size: 1.8rem; }
+
+        /* Rodapé de checkout empilha */
+        .checkout-footer-actions { flex-direction: column-reverse; gap: 10px; align-items: stretch; }
+        .checkout-footer-actions .btn-action { justify-content: center; width: 100%; }
+        .btn-lg-wide { padding: 14px 20px; font-size: 0.95rem; }
+
+        /* Tabela: esconde coluna "Unitário" em telas apertadas */
+        .tabela-venda-dark th:nth-child(3),
+        .tabela-venda-dark td:nth-child(3) { display: none; }
+        .tabela-venda-dark th,
+        .tabela-venda-dark td { font-size: 0.85rem; padding: 8px 6px; }
+
+        /* Qty control menor */
+        .btn-qty { width: 32px; height: 32px; font-size: 0.85rem; }
+        .qty-input { width: 50px; font-size: 0.9rem; }
+
+        /* Resumo de pagamento */
+        .payment-summary-card { padding: 16px; }
+        .summary-item.main .value { font-size: 1.3rem; }
+        .summary-item .value { font-size: 1rem; }
+        .value-input-wrapper { padding: 8px 14px; }
+        .clean-input { width: 100px; font-size: 1.1rem; }
+
+        /* Carrinho vazio */
+        .empty-cart-v2 { padding: 40px 20px; }
+        .empty-icon-wrapper { width: 80px; height: 80px; }
+        .empty-icon-wrapper i { font-size: 2.8rem; }
+
+        /* Tela de conclusão */
+        .venda-concluida-container { padding: 32px 12px; }
+        .success-icon-wrapper { width: 90px; height: 90px; }
+        .success-icon-wrapper i { font-size: 3rem; }
+        .success-title { font-size: 1.8rem; }
+        .success-total-value { font-size: 1.7rem; }
+        .success-total-badge { padding: 16px 28px; }
+
+        /* QR Code */
+        .qr-image-large { width: 180px; height: 180px; }
+        .qr-wrapper { padding: 16px; }
+    }
+
+    @@media (max-width: 700px) {
+        .venda-modern-container { padding: 8px; }
+        .venda-card { padding: 12px; border-radius: 12px; }
+
+        /* Cabeçalho checkout compacto */
+        .checkout-title h3 { font-size: 1.1rem; }
+        .checkout-summary-info { align-items: flex-start; }
+
+        /* Tabela: esconde também "Ações" e usa ícone menor de remover */
+        .tabela-venda-dark { font-size: 0.8rem; }
+        .cart-items-container { max-height: 38vh; }
+
+        /* Botões de ação menores */
+        .btn-action { padding: 12px 18px; font-size: 0.9rem; border-radius: 10px; }
+
+        /* Step label */
+        .step-label { font-size: 0.95rem; }
+
+        /* Tela de conclusão ainda mais compacta */
+        .success-title { font-size: 1.5rem; }
+        .success-total-value { font-size: 1.5rem; }
+        .success-actions { max-width: 100%; }
+
+        /* QR code menor */
+        .qr-image-large { width: 150px; height: 150px; }
+        .qr-container-large { max-width: 100%; }
+    }
 </style>
 
 @code {
@@ -554,6 +730,7 @@
     private int etapaAtual = 1;
     private List<ItemVendaDTO> carrinho = new();
     private decimal totalVenda;
+    private decimal totalVendaConcluida;
     private string codigoBarrasInput = string.Empty;
     private string mensagemErro = string.Empty;
     private string mensagemErroQR = string.Empty;
@@ -841,10 +1018,10 @@
 
     private async Task FinalizarVendaSemAssinatura()
     {
+        totalVendaConcluida = totalVenda;
         LimparDadosVenda();
-        etapaAtual   = 1;
+        etapaAtual   = 5;
         mensagemErro = string.Empty;
-        await FocarInput();
     }
 
     private async Task GerarQRCode(Guid documentoGuid)
@@ -884,10 +1061,10 @@
 
         if (isAssinado)
         {
+            totalVendaConcluida = totalVenda;
             LimparDadosVenda();
-            etapaAtual   = 1;
+            etapaAtual   = 5;
             mensagemErro = string.Empty;
-            await FocarInput();
         }
         else
         {
@@ -986,6 +1163,17 @@
 
     private string FormatarNumero(decimal valor) =>
         valor.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+
+    private async Task RealizarNovaVenda()
+    {
+        etapaAtual = 1;
+        await FocarInput();
+    }
+
+    private void VoltarPaginaPrincipal()
+    {
+        Navigation.NavigateTo("/mainpage");
+    }
 
     private void LimparDadosVenda()
     {

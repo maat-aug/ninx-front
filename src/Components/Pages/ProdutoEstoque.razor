@@ -1,0 +1,836 @@
+@page "/mainpage/produtosestoque"
+@using NinxERP.Domain.DTOs
+@using NinxERP.Domain.Interfaces
+@using NinxERP.Domain.Entities
+@inject IEstoqueService EstoqueService
+@inject IProdutoService ProdutoService
+@inject UserSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Estoque — Ninx</PageTitle>
+
+<div class="estoque-container">
+    @if (!Session.IsAuthenticated)
+    {
+        <div class="auth-guard">
+            <p>Acesso negado. Redirecionando...</p>
+        </div>
+    }
+    else
+    {
+        @* ── CABEÇALHO ── *@
+        <div class="estoque-header">
+            <div class="header-left">
+                <h2><i class="bi bi-boxes"></i> Estoque & Produtos</h2>
+                <span class="header-subtitle">Gerencie produtos e quantidades em estoque</span>
+            </div>
+            <div class="header-actions">
+                <div class="search-bar">
+                    <i class="bi bi-search"></i>
+                    <input type="text"
+                           value="@termoBusca"
+                           @oninput="e => { termoBusca = e.Value?.ToString() ?? string.Empty; FiltrarProdutos(); }"
+                           placeholder="Buscar por nome ou código de barras..." />
+                    @if (!string.IsNullOrEmpty(termoBusca))
+                    {
+                        <button class="btn-clear-search" @onclick="LimparBusca"><i class="bi bi-x"></i></button>
+                    }
+                </div>
+                <button class="btn-novo-produto" @onclick="AbrirModalNovoProduto">
+                    <i class="bi bi-plus-lg"></i> Novo Produto
+                </button>
+            </div>
+        </div>
+
+        @* ── ALERTAS ── *@
+        @if (!string.IsNullOrEmpty(mensagemSucesso))
+        {
+            <div class="alert-estoque success animate-fade-in">
+                <i class="bi bi-check-circle-fill"></i> @mensagemSucesso
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(mensagemErro))
+        {
+            <div class="alert-estoque error animate-fade-in">
+                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErro
+            </div>
+        }
+
+        @* ── CARDS DE RESUMO ── *@
+        <div class="resumo-cards">
+            <div class="resumo-card">
+                <div class="resumo-icon blue"><i class="bi bi-box-seam"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@produtosFiltrados.Count</span>
+                    <span class="resumo-label">Produtos</span>
+                </div>
+            </div>
+            <div class="resumo-card">
+                <div class="resumo-icon green"><i class="bi bi-check2-circle"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => ObterEstoque(p.ProdutoID)?.Quantidade > 0)</span>
+                    <span class="resumo-label">Em Estoque</span>
+                </div>
+            </div>
+            <div class="resumo-card">
+                <div class="resumo-icon yellow"><i class="bi bi-exclamation-triangle"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => EstoqueAbaixoMinimo(p.ProdutoID))</span>
+                    <span class="resumo-label">Abaixo do Mínimo</span>
+                </div>
+            </div>
+            <div class="resumo-card">
+                <div class="resumo-icon red"><i class="bi bi-slash-circle"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => ObterEstoque(p.ProdutoID)?.Quantidade == 0)</span>
+                    <span class="resumo-label">Sem Estoque</span>
+                </div>
+            </div>
+        </div>
+
+        @* ── TABELA PRINCIPAL ── *@
+        <div class="estoque-card">
+            @if (isCarregando)
+            {
+                <div class="loading-state">
+                    <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem;"></div>
+                    <p>Carregando produtos...</p>
+                </div>
+            }
+            else if (produtosFiltrados.Count == 0)
+            {
+                <div class="empty-state">
+                    <i class="bi bi-inbox"></i>
+                    <h4>Nenhum produto encontrado</h4>
+                    <p>@(string.IsNullOrEmpty(termoBusca) ? "Adicione o primeiro produto clicando em \"Novo Produto\"." : "Tente outro termo de busca.")</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-wrapper">
+                    <table class="tabela-estoque">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Código</th>
+                                <th class="text-center">Qtd. Estoque</th>
+                                <th class="text-center">Qtd. Mínima</th>
+                                <th class="text-end">Preço Venda</th>
+                                <th class="text-end">Preço Custo</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var produto in produtosFiltrados)
+                            {
+                                var estoque = ObterEstoque(produto.ProdutoID);
+                                var status  = ObterStatus(produto.ProdutoID);
+                                <tr class="@(produto.Ativo ? "" : "row-inativo")">
+                                    <td>
+                                        <div class="produto-nome">@produto.Nome</div>
+                                        <small class="produto-meta">@produto.UnidadeMedida · @produto.CategoriaNome</small>
+                                    </td>
+                                    <td>
+                                        <span class="codigo-barras-pill">@(string.IsNullOrEmpty(produto.CodigoBarras) ? "—" : produto.CodigoBarras)</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="qty-badge @status.Classe">@(estoque?.Quantidade ?? 0)</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="qty-minima">@(estoque?.QuantidadeMinima ?? 0)</span>
+                                    </td>
+                                    <td class="text-end fw-bold">R$ @produto.PrecoVenda.ToString()</td>
+                                    <td class="text-end text-muted-soft">R$ @produto.PrecoCusto.ToString()</td>
+                                    <td class="text-center">
+                                        <span class="status-pill @status.Classe">@status.Texto</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="acoes-grupo">
+                                            <button class="btn-acao edit" title="Editar produto" @onclick="() => AbrirModalEdicao(produto)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn-acao stock" title="Ajustar estoque" @onclick="() => AbrirModalEstoque(produto, estoque)">
+                                                <i class="bi bi-clipboard2-plus"></i>
+                                            </button>
+                                            <button class="btn-acao delete" title="Excluir produto" @onclick="() => ConfirmarExclusao(produto)">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        @* ══════════════════════════════════════════════
+           MODAL — NOVO / EDITAR PRODUTO
+           ══════════════════════════════════════════════ *@
+        @if (modalProdutoAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalProduto">
+                <div class="modal-card" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4><i class="bi @(editandoProduto ? "bi-pencil-square" : "bi-plus-circle")"></i> @(editandoProduto ? "Editar Produto" : "Novo Produto")</h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalProduto"><i class="bi bi-x-lg"></i></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="form-grid">
+                            <div class="form-group span-2">
+                                <label>Nome do Produto</label>
+                                <input type="text" @bind="formProduto.Nome" placeholder="Ex: Arroz Integral 1kg" class="form-input" />
+                            </div>
+                            <div class="form-group">
+                                <label>Código de Barras</label>
+                                <input type="text" @bind="formProduto.CodigoBarras" placeholder="Ex: 7891234567890" class="form-input" />
+                            </div>
+                            <div class="form-group">
+                                <label>Unidade de Medida</label>
+                                <input type="text" @bind="formProduto.UnidadeMedida" placeholder="Ex: UN, KG, L" class="form-input" />
+                            </div>
+                            <div class="form-group">
+                                <label>Preço de Venda (R$)</label>
+                                <input type="number" step="0.01" @bind="formProduto.PrecoVenda" class="form-input" />
+                            </div>
+                            <div class="form-group">
+                                <label>Preço de Custo (R$)</label>
+                                <input type="number" step="0.01" @bind="formProduto.PrecoCusto" class="form-input" />
+                            </div>
+                            <div class="form-group">
+                                <label>Validade</label>
+                                <input type="date" @bind="formProduto.Validade" class="form-input" />
+                            </div>
+                            @if (!editandoProduto)
+                            {
+                                <div class="form-group">
+                                    <label>Estoque Inicial</label>
+                                    <input type="number" @bind="formProduto.EstoqueInicial" min="0" class="form-input" />
+                                </div>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensagemErroModal))
+                        {
+                            <div class="alert-estoque error mt-3">
+                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroModal
+                            </div>
+                        }
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalProduto">Cancelar</button>
+                        <button class="btn-action primary" @onclick="SalvarProduto" disabled="@isSalvando">
+                            @if (isSalvando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            @(editandoProduto ? "Salvar Alterações" : "Criar Produto")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* ══════════════════════════════════════════════
+           MODAL — AJUSTAR ESTOQUE
+           ══════════════════════════════════════════════ *@
+        @if (modalEstoqueAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalEstoque">
+                <div class="modal-card modal-card-sm" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4><i class="bi bi-clipboard2-plus"></i> Ajustar Estoque</h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalEstoque"><i class="bi bi-x-lg"></i></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="produto-destaque-modal">
+                            <i class="bi bi-box-seam"></i>
+                            <div>
+                                <strong>@produtoSelecionado?.Nome</strong>
+                                <small>@produtoSelecionado?.UnidadeMedida</small>
+                            </div>
+                        </div>
+
+                        <div class="form-grid mt-4">
+                            <div class="form-group">
+                                <label>Quantidade em Estoque</label>
+                                <input type="number" @bind="formEstoque.Quantidade" min="0" class="form-input form-input-lg" />
+                            </div>
+                            <div class="form-group">
+                                <label>Quantidade Mínima</label>
+                                <input type="number" @bind="formEstoque.QuantidadeMinima" min="0" class="form-input form-input-lg" />
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensagemErroModal))
+                        {
+                            <div class="alert-estoque error mt-3">
+                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroModal
+                            </div>
+                        }
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalEstoque">Cancelar</button>
+                        <button class="btn-action success" @onclick="SalvarEstoque" disabled="@isSalvando">
+                            @if (isSalvando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            Confirmar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* ══════════════════════════════════════════════
+           MODAL — CONFIRMAR EXCLUSÃO
+           ══════════════════════════════════════════════ *@
+        @if (modalExclusaoAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalExclusao">
+                <div class="modal-card modal-card-sm" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4><i class="bi bi-trash3 text-danger"></i> Excluir Produto</h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalExclusao"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="modal-body text-center" style="padding: 32px 24px;">
+                        <div class="delete-icon-wrapper">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+                        <p class="delete-confirm-text">Tem certeza que deseja excluir <strong>@produtoSelecionado?.Nome</strong>?</p>
+                        <p class="delete-confirm-sub">Esta ação não pode ser desfeita.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalExclusao">Cancelar</button>
+                        <button class="btn-action danger" @onclick="ExcluirProduto" disabled="@isSalvando">
+                            @if (isSalvando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    /* ── Container ── */
+    .estoque-container { padding: 24px; max-width: 1400px; margin: 0 auto; color: #fff; font-family: 'Inter', sans-serif; min-height: 90vh; }
+
+    /* ── Header ── */
+    .estoque-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 28px; flex-wrap: wrap; }
+    .header-left h2 { margin: 0; font-size: 1.8rem; font-weight: 800; display: flex; align-items: center; gap: 12px; }
+    .header-left h2 i { color: #007bff; }
+    .header-subtitle { color: rgba(255,255,255,0.45); font-size: 0.9rem; margin-top: 4px; display: block; }
+    .header-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    /* ── Search ── */
+    .search-bar { display: flex; align-items: center; background: rgba(0,0,0,0.35); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 10px 18px; gap: 10px; min-width: 280px; transition: 0.25s; }
+    .search-bar:focus-within { border-color: #007bff; background: rgba(0,0,0,0.5); box-shadow: 0 0 20px rgba(0,123,255,0.15); }
+    .search-bar i { color: rgba(255,255,255,0.35); font-size: 1rem; flex-shrink: 0; }
+    .search-bar input { background: transparent; border: none; color: #fff; font-size: 0.95rem; outline: none; width: 100%; }
+    .btn-clear-search { background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer; padding: 0; display: flex; align-items: center; transition: 0.2s; }
+    .btn-clear-search:hover { color: #fff; }
+
+    /* ── Botão Novo Produto ── */
+    .btn-novo-produto { background: #007bff; border: none; color: #fff; padding: 12px 22px; border-radius: 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.25s; white-space: nowrap; }
+    .btn-novo-produto:hover { background: #0056b3; box-shadow: 0 8px 25px rgba(0,123,255,0.3); transform: translateY(-1px); }
+
+    /* ── Alertas ── */
+    .alert-estoque { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 12px; font-weight: 500; font-size: 0.95rem; margin-bottom: 20px; animation: fadeIn 0.3s ease; }
+    .alert-estoque.success { background: rgba(40,167,69,0.12); border: 1px solid rgba(40,167,69,0.3); color: #5dd879; }
+    .alert-estoque.error   { background: rgba(220,53,69,0.12);  border: 1px solid rgba(220,53,69,0.3);  color: #ff6b7d; }
+    .alert-estoque i { font-size: 1.1rem; flex-shrink: 0; }
+    .mt-3 { margin-top: 12px; }
+
+    /* ── Cards de Resumo ── */
+    .resumo-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .resumo-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; transition: 0.2s; }
+    .resumo-card:hover { background: rgba(255,255,255,0.07); transform: translateY(-2px); }
+    .resumo-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .resumo-icon.blue   { background: rgba(0,123,255,0.15);   color: #007bff; }
+    .resumo-icon.green  { background: rgba(40,167,69,0.15);   color: #28a745; }
+    .resumo-icon.yellow { background: rgba(255,193,7,0.15);   color: #ffc107; }
+    .resumo-icon.red    { background: rgba(220,53,69,0.15);   color: #dc3545; }
+    .resumo-info { display: flex; flex-direction: column; }
+    .resumo-valor { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+    .resumo-label { font-size: 0.8rem; color: rgba(255,255,255,0.45); margin-top: 4px; font-weight: 500; }
+
+    /* ── Card Principal ── */
+    .estoque-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 22px; overflow: hidden; }
+
+    /* ── States ── */
+    .loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; color: rgba(255,255,255,0.4); }
+    .empty-state i { font-size: 3.5rem; }
+    .empty-state h4 { color: #fff; margin: 0; font-weight: 700; }
+    .empty-state p { margin: 0; font-size: 1rem; text-align: center; }
+
+    /* ── Tabela ── */
+    .table-wrapper { overflow-x: auto; }
+    .tabela-estoque { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .tabela-estoque thead tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .tabela-estoque th { padding: 14px 16px; color: rgba(255,255,255,0.4); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .tabela-estoque td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+    .tabela-estoque tbody tr { transition: background 0.15s; }
+    .tabela-estoque tbody tr:hover { background: rgba(255,255,255,0.03); }
+    .tabela-estoque tbody tr:last-child td { border-bottom: none; }
+    .row-inativo { opacity: 0.5; }
+
+    .produto-nome { font-weight: 600; color: #fff; }
+    .produto-meta { color: rgba(255,255,255,0.4); font-size: 0.8rem; }
+    .codigo-barras-pill { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 4px 10px; font-size: 0.82rem; font-family: monospace; color: rgba(255,255,255,0.6); white-space: nowrap; }
+    .text-muted-soft { color: rgba(255,255,255,0.4) !important; }
+    .fw-bold { font-weight: 700; }
+
+    /* ── Badges de quantidade ── */
+    .qty-badge { display: inline-block; min-width: 42px; text-align: center; padding: 5px 12px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; }
+    .qty-badge.ok      { background: rgba(40,167,69,0.12);  color: #5dd879; }
+    .qty-badge.baixo   { background: rgba(255,193,7,0.12);  color: #ffc107; }
+    .qty-badge.zerado  { background: rgba(220,53,69,0.12);  color: #ff6b7d; }
+    .qty-minima { color: rgba(255,255,255,0.35); font-size: 0.9rem; font-weight: 600; }
+
+    /* ── Status pill ── */
+    .status-pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+    .status-pill.ok     { background: rgba(40,167,69,0.15);  color: #5dd879; border: 1px solid rgba(40,167,69,0.25); }
+    .status-pill.baixo  { background: rgba(255,193,7,0.15);  color: #ffc107; border: 1px solid rgba(255,193,7,0.25); }
+    .status-pill.zerado { background: rgba(220,53,69,0.15);  color: #ff6b7d; border: 1px solid rgba(220,53,69,0.25); }
+
+    /* ── Ações ── */
+    .acoes-grupo { display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-acao { width: 36px; height: 36px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; transition: 0.2s; }
+    .btn-acao.edit   { background: rgba(0,123,255,0.1);  border-color: rgba(0,123,255,0.2);  color: #007bff; }
+    .btn-acao.stock  { background: rgba(40,167,69,0.1);  border-color: rgba(40,167,69,0.2);  color: #28a745; }
+    .btn-acao.delete { background: rgba(220,53,69,0.1);  border-color: rgba(220,53,69,0.2);  color: #dc3545; }
+    .btn-acao:hover { transform: scale(1.12); filter: brightness(1.3); }
+
+    /* ── Modais ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; animation: fadeIn 0.2s ease; }
+    .modal-card { background: #1a1f2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; width: 100%; max-width: 640px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; animation: modalSlide 0.25s ease-out; }
+    .modal-card-sm { max-width: 460px; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .modal-header h4 { margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .btn-fechar-modal { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+    .btn-fechar-modal:hover { background: rgba(220,53,69,0.15); color: #dc3545; border-color: rgba(220,53,69,0.3); }
+    .modal-body { padding: 24px 28px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 18px 28px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* ── Formulário ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.span-2 { grid-column: span 2; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
+    .form-input { background: rgba(0,0,0,0.3); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px; color: #fff; padding: 11px 16px; font-size: 0.95rem; outline: none; transition: 0.2s; width: 100%; box-sizing: border-box; }
+    .form-input:focus { border-color: #007bff; background: rgba(0,0,0,0.45); box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
+    .form-input-lg { font-size: 1.3rem; font-weight: 700; text-align: center; padding: 14px; }
+
+    /* ── Produto destaque no modal de estoque ── */
+    .produto-destaque-modal { display: flex; align-items: center; gap: 14px; background: rgba(0,123,255,0.07); border: 1px solid rgba(0,123,255,0.15); border-radius: 14px; padding: 16px 20px; }
+    .produto-destaque-modal i { font-size: 1.8rem; color: #007bff; flex-shrink: 0; }
+    .produto-destaque-modal div { display: flex; flex-direction: column; gap: 2px; }
+    .produto-destaque-modal strong { font-size: 1rem; font-weight: 700; }
+    .produto-destaque-modal small { color: rgba(255,255,255,0.4); font-size: 0.82rem; }
+
+    /* ── Modal de Exclusão ── */
+    .delete-icon-wrapper { width: 72px; height: 72px; background: rgba(220,53,69,0.12); border: 2px solid rgba(220,53,69,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+    .delete-icon-wrapper i { font-size: 2rem; color: #dc3545; }
+    .delete-confirm-text { font-size: 1.05rem; font-weight: 600; margin: 0 0 8px; }
+    .delete-confirm-sub  { color: rgba(255,255,255,0.4); font-size: 0.9rem; margin: 0; }
+
+    /* ── Botões gerais ── */
+    .btn-action { padding: 11px 24px; border-radius: 12px; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.25s; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .btn-action.primary   { background: #007bff; color: #fff; }
+    .btn-action.primary:hover:not(:disabled) { background: #0056b3; box-shadow: 0 8px 20px rgba(0,123,255,0.3); }
+    .btn-action.secondary { background: rgba(255,255,255,0.07); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+    .btn-action.secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+    .btn-action.success   { background: #28a745; color: #fff; }
+    .btn-action.success:hover:not(:disabled) { background: #1e7e34; box-shadow: 0 8px 20px rgba(40,167,69,0.3); }
+    .btn-action.danger    { background: #dc3545; color: #fff; }
+    .btn-action.danger:hover:not(:disabled) { background: #b02a37; box-shadow: 0 8px 20px rgba(220,53,69,0.3); }
+    .btn-action:disabled  { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+    /* ── Animações ── */
+    .animate-fade-in { animation: fadeIn 0.35s ease; }
+    @@keyframes fadeIn      { from { opacity: 0; }                       to { opacity: 1; } }
+    @@keyframes modalSlide  { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+    /* Custom scrollbar */
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+    *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+    /* ════════════════════════════════════════════
+       RESPONSIVIDADE
+       ════════════════════════════════════════════ */
+
+    @@media (max-width: 1200px) {
+        .resumo-cards { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @@media (max-width: 1024px) {
+        .estoque-container { padding: 16px; }
+        .header-left h2 { font-size: 1.5rem; }
+        .tabela-estoque th, .tabela-estoque td { padding: 12px 10px; }
+        /* Esconde preço de custo em telas médias */
+        .tabela-estoque th:nth-child(6),
+        .tabela-estoque td:nth-child(6) { display: none; }
+    }
+
+    @@media (max-width: 860px) {
+        .estoque-header { flex-direction: column; align-items: stretch; }
+        .header-actions { flex-direction: column; }
+        .search-bar { min-width: unset; width: 100%; }
+        .btn-novo-produto { justify-content: center; }
+        .resumo-cards { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .resumo-valor { font-size: 1.5rem; }
+        /* Esconde coluna de código em telas menores */
+        .tabela-estoque th:nth-child(2),
+        .tabela-estoque td:nth-child(2) { display: none; }
+        .form-grid { grid-template-columns: 1fr; }
+        .form-group.span-2 { grid-column: span 1; }
+    }
+
+    @@media (max-width: 640px) {
+        .estoque-container { padding: 10px; }
+        .resumo-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .resumo-card { padding: 14px 16px; gap: 12px; border-radius: 14px; }
+        .resumo-icon { width: 40px; height: 40px; font-size: 1.2rem; border-radius: 10px; }
+        .resumo-valor { font-size: 1.3rem; }
+        /* Em telas muito pequenas esconde qtd mínima e status, mantém as essenciais */
+        .tabela-estoque th:nth-child(4),
+        .tabela-estoque td:nth-child(4) { display: none; }
+        .tabela-estoque th:nth-child(7),
+        .tabela-estoque td:nth-child(7) { display: none; }
+        .modal-card { border-radius: 16px; }
+        .modal-header, .modal-body, .modal-footer { padding-left: 18px; padding-right: 18px; }
+    }
+</style>
+
+@code {
+    // ── Estado geral ──
+    private List<ProdutoDTO>  produtos          = new();
+    private List<EstoqueDTO>  estoques          = new();
+    private List<ProdutoDTO>  produtosFiltrados = new();
+    private string            termoBusca        = string.Empty;
+    private bool              isCarregando      = true;
+    private string            mensagemSucesso   = string.Empty;
+    private string            mensagemErro      = string.Empty;
+
+    // ── Modais ──
+    private bool              modalProdutoAberto  = false;
+    private bool              modalEstoqueAberto  = false;
+    private bool              modalExclusaoAberto = false;
+    private bool              editandoProduto     = false;
+    private bool              isSalvando          = false;
+    private string            mensagemErroModal   = string.Empty;
+
+    // ── Seleção ──
+    private ProdutoDTO?       produtoSelecionado = null;
+    private EstoqueDTO?       estoqueSelecionado = null;
+
+    // ── Formulários ──
+    private FormProduto       formProduto  = new();
+    private FormEstoque       formEstoque  = new();
+
+    // ════════════════════════════════════════════
+    // LIFECYCLE
+    // ════════════════════════════════════════════
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        isCarregando = true;
+        mensagemErro = string.Empty;
+        StateHasChanged();
+        try
+        {
+            var taskProdutos = ProdutoService.GetAllAsync();
+            var taskEstoque  = EstoqueService.GetAllAsync(new PaginacaoDTO { PageNumber = 1, PageSize = 9999 });
+            await Task.WhenAll(taskProdutos, taskEstoque);
+            produtos  = (await taskProdutos)?.ToList() ?? new();
+            estoques  = (await taskEstoque)?.ToList()  ?? new();
+            Filtrar();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = "Erro ao carregar dados. Tente novamente.";
+        }
+        finally
+        {
+            isCarregando = false;
+        }
+    }
+
+    // ════════════════════════════════════════════
+    // FILTRO / BUSCA
+    // ════════════════════════════════════════════
+
+    private void FiltrarProdutos() => Filtrar();
+    private void LimparBusca()
+    {
+        termoBusca = string.Empty;
+        Filtrar();
+    }
+
+    private void Filtrar()
+    {
+        if (string.IsNullOrWhiteSpace(termoBusca))
+        {
+            produtosFiltrados = produtos.ToList();
+        }
+        else
+        {
+            var t = termoBusca.Trim().ToLowerInvariant();
+            produtosFiltrados = produtos
+                .Where(p => p.Nome.ToLowerInvariant().Contains(t) ||
+                            (p.CodigoBarras ?? "").ToLowerInvariant().Contains(t))
+                .ToList();
+        }
+    }
+
+    // ════════════════════════════════════════════
+    // HELPERS
+    // ════════════════════════════════════════════
+
+    private EstoqueDTO? ObterEstoque(int produtoId) =>
+        estoques.FirstOrDefault(e => e.ProdutoID == produtoId);
+
+    private bool EstoqueAbaixoMinimo(int produtoId)
+    {
+        var e = ObterEstoque(produtoId);
+        return e != null && e.Quantidade > 0 && e.Quantidade < e.QuantidadeMinima;
+    }
+
+    private (string Classe, string Texto) ObterStatus(int produtoId)
+    {
+        var e = ObterEstoque(produtoId);
+        if (e == null || e.Quantidade == 0) return ("zerado", "Sem Estoque");
+        if (e.Quantidade < e.QuantidadeMinima)  return ("baixo",  "Abaixo do Mín.");
+        return ("ok", "Normal");
+    }
+
+    private async Task ExibirSucesso(string msg)
+    {
+        mensagemSucesso = msg;
+        StateHasChanged();
+        await Task.Delay(3500);
+        mensagemSucesso = string.Empty;
+        StateHasChanged();
+    }
+
+    // ════════════════════════════════════════════
+    // MODAL — PRODUTO
+    // ════════════════════════════════════════════
+
+    private void AbrirModalNovoProduto()
+    {
+        editandoProduto   = false;
+        produtoSelecionado = null;
+        formProduto       = new();
+        mensagemErroModal = string.Empty;
+        modalProdutoAberto = true;
+    }
+
+    private void AbrirModalEdicao(ProdutoDTO produto)
+    {
+        editandoProduto   = true;
+        produtoSelecionado = produto;
+        formProduto = new FormProduto
+        {
+            Nome           = produto.Nome,
+            CodigoBarras   = produto.CodigoBarras,
+            UnidadeMedida  = produto.UnidadeMedida,
+            PrecoVenda     = produto.PrecoVenda,
+            PrecoCusto     = produto.PrecoCusto,
+            Validade       = produto.Validade,
+            EstoqueInicial = 0
+        };
+        mensagemErroModal  = string.Empty;
+        modalProdutoAberto = true;
+    }
+
+    private void FecharModalProduto()
+    {
+        modalProdutoAberto = false;
+        mensagemErroModal  = string.Empty;
+    }
+
+    private async Task SalvarProduto()
+    {
+        mensagemErroModal = string.Empty;
+        if (string.IsNullOrWhiteSpace(formProduto.Nome))
+        {
+            mensagemErroModal = "O nome do produto é obrigatório.";
+            return;
+        }
+
+        isSalvando = true;
+        try
+        {
+            if (editandoProduto && produtoSelecionado != null)
+            {
+                await ProdutoService.UpdateAsync(produtoSelecionado.ProdutoID, new AtualizarProdutoDTO
+                {
+                    Nome          = formProduto.Nome,
+                    CodigoBarras  = formProduto.CodigoBarras,
+                    UnidadeMedida = formProduto.UnidadeMedida,
+                    PrecoVenda    = formProduto.PrecoVenda,
+                    PrecoCusto    = formProduto.PrecoCusto,
+                    Validade      = formProduto.Validade
+                });
+                FecharModalProduto();
+                await CarregarDados();
+                await ExibirSucesso($"Produto \"{formProduto.Nome}\" atualizado com sucesso.");
+            }
+            else
+            {
+                await ProdutoService.CreateAsync(new CriarProdutoDTO
+                {
+                    Nome           = formProduto.Nome,
+                    CodigoBarras   = formProduto.CodigoBarras,
+                    UnidadeMedida  = formProduto.UnidadeMedida,
+                    PrecoVenda     = formProduto.PrecoVenda,
+                    PrecoCusto     = formProduto.PrecoCusto,
+                    Validade       = formProduto.Validade,
+                    EstoqueInicial = formProduto.EstoqueInicial
+                });
+                FecharModalProduto();
+                await CarregarDados();
+                await ExibirSucesso($"Produto \"{formProduto.Nome}\" criado com sucesso.");
+            }
+        }
+        catch (Exception ex)
+        {
+            mensagemErroModal = "Erro ao salvar produto. Tente novamente.";
+        }
+        finally
+        {
+            isSalvando = false;
+        }
+    }
+
+    // ════════════════════════════════════════════
+    // MODAL — ESTOQUE
+    // ════════════════════════════════════════════
+
+    private void AbrirModalEstoque(ProdutoDTO produto, EstoqueDTO? estoque)
+    {
+        produtoSelecionado = produto;
+        estoqueSelecionado = estoque;
+        formEstoque = new FormEstoque
+        {
+            Quantidade        = estoque?.Quantidade        ?? 0,
+            QuantidadeMinima  = estoque?.QuantidadeMinima  ?? 0
+        };
+        mensagemErroModal  = string.Empty;
+        modalEstoqueAberto = true;
+    }
+
+    private void FecharModalEstoque()
+    {
+        modalEstoqueAberto = false;
+        mensagemErroModal  = string.Empty;
+    }
+
+    private async Task SalvarEstoque()
+    {
+        if (produtoSelecionado == null) return;
+
+        isSalvando = true;
+        mensagemErroModal = string.Empty;
+        try
+        {
+            var dto = new AtualizarEstoqueDTO
+            {
+                ProdutoID       = produtoSelecionado.ProdutoID,
+                Quantidade      = formEstoque.Quantidade,
+                QuantidadeMinima = formEstoque.QuantidadeMinima
+            };
+
+            if (estoqueSelecionado != null)
+                await EstoqueService.UpdateAsync(estoqueSelecionado.EstoqueID, dto);
+            else
+                await EstoqueService.CreateAsync(dto);
+
+            FecharModalEstoque();
+            await CarregarDados();
+            await ExibirSucesso($"Estoque de \"{produtoSelecionado.Nome}\" atualizado.");
+        }
+        catch
+        {
+            mensagemErroModal = "Erro ao atualizar estoque. Tente novamente.";
+        }
+        finally
+        {
+            isSalvando = false;
+        }
+    }
+
+    // ════════════════════════════════════════════
+    // MODAL — EXCLUSÃO
+    // ════════════════════════════════════════════
+
+    private void ConfirmarExclusao(ProdutoDTO produto)
+    {
+        produtoSelecionado  = produto;
+        modalExclusaoAberto = true;
+    }
+
+    private void FecharModalExclusao() => modalExclusaoAberto = false;
+
+    private async Task ExcluirProduto()
+    {
+        if (produtoSelecionado == null) return;
+
+        isSalvando = true;
+        try
+        {
+            await ProdutoService.DeleteAsync(produtoSelecionado.ProdutoID);
+            var nome = produtoSelecionado.Nome;
+            FecharModalExclusao();
+            await CarregarDados();
+            await ExibirSucesso($"Produto \"{nome}\" excluído.");
+        }
+        catch
+        {
+            mensagemErro = "Erro ao excluir produto. Tente novamente.";
+            FecharModalExclusao();
+        }
+        finally
+        {
+            isSalvando = false;
+        }
+    }
+
+    // ════════════════════════════════════════════
+    // FORM MODELS
+    // ════════════════════════════════════════════
+
+    private class FormProduto
+    {
+        public string   Nome           { get; set; } = string.Empty;
+        public string? CodigoBarras    { get; set; }
+        public string   UnidadeMedida  { get; set; } = string.Empty;
+        public decimal  PrecoVenda     { get; set; }
+        public decimal?  PrecoCusto     { get; set; }
+        public DateTime? Validade       { get; set; } = DateTime.Today.AddYears(1);
+        public int      EstoqueInicial { get; set; }
+    }
+
+    private class FormEstoque
+    {
+        public int Quantidade       { get; set; }
+        public int QuantidadeMinima { get; set; }
+    }
+}
