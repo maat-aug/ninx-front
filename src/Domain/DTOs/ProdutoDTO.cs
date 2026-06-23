@@ -14,4 +14,7 @@ public class ProdutoDTO
     public DateTime? Validade { get; set; }
     public bool Ativo { get; set; }
     public DateTime CriadoEm { get; set; }
+    public int EstoqueID { get; set; }
+    public decimal Quantidade { get; set; }
+    public decimal QuantidadeMinima { get; set; }
 }

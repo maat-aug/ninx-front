@@ -4,7 +4,7 @@ namespace NinxERP.Domain.Interfaces;
 
 public interface IEstoqueService
 {
-    Task<List<EstoqueDTO>> GetAllAsync(PaginacaoDTO paginacao);
+    Task<List<EstoqueDTO>> GetAllAsync();
     Task<EstoqueDTO?> GetByIdAsync(int estoqueId);
     Task<bool> CreateAsync(AtualizarEstoqueDTO dto);
     Task<bool> UpdateAsync(int estoqueId, AtualizarEstoqueDTO dto);

@@ -16,14 +16,11 @@ public class EstoqueService : IEstoqueService
         _config = config;
     }
 
-    public async Task<List<EstoqueDTO>> GetAllAsync(PaginacaoDTO paginacao)
+    public async Task<List<EstoqueDTO>> GetAllAsync()
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(_config.GetEndpointUrl("/api/Estoque/All"), paginacao);
-            if (response.IsSuccessStatusCode)
-                return await response.Content.ReadFromJsonAsync<List<EstoqueDTO>>() ?? new();
-            return new();
+            return await _httpClient.GetFromJsonAsync<List<EstoqueDTO>>(_config.GetEndpointUrl("/api/Estoque/All")) ?? new();
         }
         catch
         {

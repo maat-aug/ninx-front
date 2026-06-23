@@ -136,10 +136,10 @@
                                         <span class="codigo-barras-pill">@(string.IsNullOrEmpty(produto.CodigoBarras) ? "—" : produto.CodigoBarras)</span>
                                     </td>
                                     <td class="text-center">
-                                        <span class="qty-badge @status.Classe">@(estoque?.Quantidade ?? 0)</span>
+                                        <span class="qty-badge @status.Classe">@((int)produto.Quantidade)</span>
                                     </td>
                                     <td class="text-center">
-                                        <span class="qty-minima">@(estoque?.QuantidadeMinima ?? 0)</span>
+                                        <span class="qty-minima">@((int)produto.QuantidadeMinima)</span>
                                     </td>
                                     <td class="text-end fw-bold">R$ @produto.PrecoVenda.ToString()</td>
                                     <td class="text-end text-muted-soft">R$ @produto.PrecoCusto.ToString()</td>
@@ -151,7 +151,7 @@
                                             <button class="btn-acao edit" title="Editar produto" @onclick="() => AbrirModalEdicao(produto)">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <button class="btn-acao stock" title="Ajustar estoque" @onclick="() => AbrirModalEstoque(produto, estoque)">
+                                            <button class="btn-acao stock" title="Ajustar estoque" @onclick="() => AbrirModalEstoque(produto)">
                                                 <i class="bi bi-clipboard2-plus"></i>
                                             </button>
                                             <button class="btn-acao delete" title="Excluir produto" @onclick="() => ConfirmarExclusao(produto)">
@@ -555,11 +555,8 @@
         StateHasChanged();
         try
         {
-            var taskProdutos = ProdutoService.GetAllAsync();
-            var taskEstoque  = EstoqueService.GetAllAsync(new PaginacaoDTO { PageNumber = 1, PageSize = 9999 });
-            await Task.WhenAll(taskProdutos, taskEstoque);
-            produtos  = (await taskProdutos)?.ToList() ?? new();
-            estoques  = (await taskEstoque)?.ToList()  ?? new();
+            produtos = await ProdutoService.GetAllAsync();
+            estoques = await EstoqueService.GetAllAsync();
             Filtrar();
         }
         catch (Exception ex)
@@ -603,8 +600,8 @@
     // HELPERS
     // ════════════════════════════════════════════
 
-    private EstoqueDTO? ObterEstoque(int produtoId) =>
-        estoques.FirstOrDefault(e => e.ProdutoID == produtoId);
+    private ProdutoDTO? ObterEstoque(int produtoId) =>
+        produtos.FirstOrDefault(e => e.ProdutoID == produtoId);
 
     private bool EstoqueAbaixoMinimo(int produtoId)
     {
@@ -698,6 +695,7 @@
                 await ProdutoService.CreateAsync(new CriarProdutoDTO
                 {
                     Nome           = formProduto.Nome,
+                    ComercioID =  (Convert.ToInt32(Session.CurrentCommerceId)),
                     CodigoBarras   = formProduto.CodigoBarras,
                     UnidadeMedida  = formProduto.UnidadeMedida,
                     PrecoVenda     = formProduto.PrecoVenda,
@@ -724,14 +722,14 @@
     // MODAL — ESTOQUE
     // ════════════════════════════════════════════
 
-    private void AbrirModalEstoque(ProdutoDTO produto, EstoqueDTO? estoque)
+    private void AbrirModalEstoque(ProdutoDTO produto)
     {
         produtoSelecionado = produto;
-        estoqueSelecionado = estoque;
+        estoqueSelecionado = estoques.FirstOrDefault(x => x.ProdutoID == produto.ProdutoID);
         formEstoque = new FormEstoque
         {
-            Quantidade        = estoque?.Quantidade        ?? 0,
-            QuantidadeMinima  = estoque?.QuantidadeMinima  ?? 0
+            Quantidade        = (int)produto?.Quantidade,
+            QuantidadeMinima  = (int)produto?.QuantidadeMinima
         };
         mensagemErroModal  = string.Empty;
         modalEstoqueAberto = true;
