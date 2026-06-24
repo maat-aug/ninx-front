@@ -4,7 +4,7 @@ namespace NinxERP.Domain.Interfaces;
 
 public interface IProdutoService
 {
-    Task<List<ProdutoDTO>> GetAllAsync();
+    Task<PaginatedResponse<ProdutoDTO>?> GetProdutosEstoqueByComercioIdAsync(int pageNumber, int pageSize, string? tipoFiltro);
     Task<ProdutoDTO?> GetByIdAsync(int produtoId);
     Task<ProdutoDTO?> GetByCodigoBarrasAsync(string codigoBarras);
     Task<ProdutoDTO?> GetByNomeAsync(string nome);

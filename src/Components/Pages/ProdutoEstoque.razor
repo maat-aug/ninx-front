@@ -215,6 +215,34 @@
             }
         </div>
 
+        @* ── CONTROLES DE PAGINAÇÃO ── *@
+        @if (totalPaginas > 1)
+        {
+            <div class="paginacao-container">
+                <div class="paginacao-info">
+                    Exibindo página <strong>@paginaAtual</strong> de <strong>@totalPaginas</strong> (Total de @totalItens produtos)
+                </div>
+                <div class="paginacao-botoes">
+                    <button class="btn-paginacao" @onclick="() => MudarPagina(paginaAtual - 1)" disabled="@(paginaAtual == 1)">
+                        <i class="bi bi-chevron-left"></i> Anterior
+                    </button>
+
+                    @for (int i = 1; i <= totalPaginas; i++)
+                    {
+                        var paginaNumero = i;
+                        <button class="btn-paginacao-numero @(paginaNumero == paginaAtual ? "ativo" : "")"
+                                @onclick="() => MudarPagina(paginaNumero)">
+                            @paginaNumero
+                        </button>
+                    }
+
+                    <button class="btn-paginacao" @onclick="() => MudarPagina(paginaAtual + 1)" disabled="@(paginaAtual == totalPaginas)">
+                        Próxima <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        }
+
         @* ══════════════════════════════════════════════
            MODAL — NOVO / EDITAR PRODUTO
            ══════════════════════════════════════════════ *@
@@ -1323,6 +1351,82 @@
         color: #28a745;
     }
 
+    .paginacao-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .paginacao-info {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.85rem;
+    }
+
+        .paginacao-info strong {
+            color: #fff;
+        }
+
+    .paginacao-botoes {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-paginacao {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+        .btn-paginacao:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-paginacao:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+    .btn-paginacao-numero {
+        background: transparent;
+        border: 1px solid transparent;
+        color: rgba(255, 255, 255, 0.5);
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+        .btn-paginacao-numero:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+        }
+
+        .btn-paginacao-numero.ativo {
+            background: rgba(0, 123, 255, 0.15);
+            border-color: rgba(0, 123, 255, 0.3);
+            color: #007bff;
+        }
+
     @@keyframes fadeIn {
         from {
             opacity: 0;
@@ -1368,6 +1472,10 @@
     private string mensagemSucesso = string.Empty;
     private string mensagemErro = string.Empty;
 
+    private int paginaAtual = 1;
+    private int itensPorPagina = 10;
+    private int totalItens = 0;
+    private int totalPaginas => (int)Math.Ceiling((double)totalItens / itensPorPagina);
     // Modais
     private bool modalProdutoAberto = false;
     private bool modalEstoqueAberto = false;
@@ -1388,6 +1496,7 @@
     private bool exibirSemEstoque = true;
     private bool exibirDesativados = false;
     private bool exibirPainelFiltros = false;
+    private string filtroSelecionado = "Todos";
 
     private void TogglePainelFiltros() => exibirPainelFiltros = !exibirPainelFiltros;
 
@@ -1401,24 +1510,49 @@
         await CarregarDados();
     }
 
-    private async Task CarregarDados()
+private async Task CarregarDados()
     {
         isCarregando = true;
         mensagemErro = string.Empty;
         StateHasChanged();
+
         try
         {
-            produtos = await ProdutoService.GetAllAsync();
-            Filtrar();
+            var request = new { PageNumber = paginaAtual, PageSize = itensPorPagina };
+            var resultado = await ProdutoService.GetProdutosEstoqueByComercioIdAsync(paginaAtual, itensPorPagina, filtroSelecionado);
+            if (resultado != null)
+            {
+                produtos = resultado.Data ?? new List<ProdutoDTO>();
+                totalItens = resultado.TotalRecords; 
+                
+                produtosFiltrados = produtos; 
+            }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            mensagemErro = "Erro ao carregar dados. Tente novamente.";
+            mensagemErro = "Erro ao carregar os produtos do estoque.";
         }
         finally
         {
             isCarregando = false;
+            StateHasChanged();
         }
+    }
+
+    private async Task MudarPagina(int novaPagina)
+    {
+        if (novaPagina >= 1 && novaPagina <= totalPaginas && novaPagina != paginaAtual)
+        {
+            paginaAtual = novaPagina;
+            await CarregarDados();
+        }
+    }
+
+    private async Task AlterarFiltro(string novoFiltro)
+    {
+        filtroSelecionado = novoFiltro;
+        paginaAtual = 1; 
+        await CarregarDados(); 
     }
 
     private void FiltrarProdutos() => Filtrar();

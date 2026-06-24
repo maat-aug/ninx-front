@@ -16,15 +16,16 @@ public class ProdutoService : IProdutoService
         _config = config;
     }
 
-    public async Task<List<ProdutoDTO>> GetAllAsync()
+    public async Task<PaginatedResponse<ProdutoDTO>?> GetProdutosEstoqueByComercioIdAsync(int pageNumber, int pageSize, string? tipoFiltro)
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<List<ProdutoDTO>>(_config.GetEndpointUrl("/api/Produto/GetAll")) ?? new();
+            var url = _config.GetEndpointUrl($"/api/Produto/GetAllPaginated?PageNumber={pageNumber}&PageSize={pageSize}&TipoFiltro={tipoFiltro}");
+            return await _httpClient.GetFromJsonAsync<PaginatedResponse<ProdutoDTO>>(url);
         }
         catch
         {
-            return new();
+            return null;
         }
     }
 
