@@ -20,26 +20,69 @@
     else
     {
         @* ── CABEÇALHO ── *@
+        @* ── CABEÇALHO COM FILTRO RETRÁTIL SLIM ── *@
         <div class="estoque-header">
             <div class="header-left">
                 <h2><i class="bi bi-boxes"></i> Estoque & Produtos</h2>
                 <span class="header-subtitle">Gerencie produtos e quantidades em estoque</span>
             </div>
-            <div class="header-actions">
-                <div class="search-bar">
-                    <i class="bi bi-search"></i>
-                    <input type="text"
-                           value="@termoBusca"
-                           @oninput="e => { termoBusca = e.Value?.ToString() ?? string.Empty; FiltrarProdutos(); }"
-                           placeholder="Buscar por nome ou código de barras..." />
-                    @if (!string.IsNullOrEmpty(termoBusca))
-                    {
-                        <button class="btn-clear-search" @onclick="LimparBusca"><i class="bi bi-x"></i></button>
-                    }
+
+            <div class="header-actions-container">
+                <div class="header-actions">
+                    @* Botão de Filtro à esquerda da busca *@
+                    <button class="btn-filtro-toggle @(exibirPainelFiltros ? "ativo" : "")"
+                            @onclick="TogglePainelFiltros"
+                            title="Filtrar por Status">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+
+                    <div class="search-bar">
+                        <i class="bi bi-search"></i>
+                        <input type="text"
+                               value="@termoBusca"
+                               @oninput="e => { termoBusca = e.Value?.ToString() ?? string.Empty; FiltrarProdutos(); }"
+                               placeholder="Buscar por nome ou código de barras..." />
+                        @if (!string.IsNullOrEmpty(termoBusca))
+                        {
+                            <button class="btn-clear-search" @onclick="LimparBusca"><i class="bi bi-x"></i></button>
+                        }
+                    </div>
+
+                    <button class="btn-novo-produto" @onclick="AbrirModalNovoProduto">
+                        <i class="bi bi-plus-lg"></i> Novo Produto
+                    </button>
                 </div>
-                <button class="btn-novo-produto" @onclick="AbrirModalNovoProduto">
-                    <i class="bi bi-plus-lg"></i> Novo Produto
-                </button>
+
+                @* Mini Painel de Filtros Ultrafino *@
+                @if (exibirPainelFiltros)
+                {
+                    <div class="dropdown-overlay" @onclick="() => exibirPainelFiltros = false"></div>
+
+                    <div class="painel-filtros-dropdown">
+                        <span class="filtros-label">Status:</span>
+                        <div class="filtros-pills-grupo">
+                            <label class="filtro-pill status-ok @(exibirNormal ? "selecionado" : "")">
+                                <input type="checkbox" checked="@exibirNormal" @onchange="e => { exibirNormal = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <span class="indicador-cor"></span> Normal
+                            </label>
+
+                            <label class="filtro-pill status-baixo @(exibirBaixoMinimo ? "selecionado" : "")">
+                                <input type="checkbox" checked="@exibirBaixoMinimo" @onchange="e => { exibirBaixoMinimo = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <span class="indicador-cor"></span> Abaixo do Mínimo
+                            </label>
+
+                            <label class="filtro-pill status-zerado @(exibirSemEstoque ? "selecionado" : "")">
+                                <input type="checkbox" checked="@exibirSemEstoque" @onchange="e => { exibirSemEstoque = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <span class="indicador-cor"></span> Sem Estoque
+                            </label>
+
+                            <label class="filtro-pill status-inativo @(exibirDesativados ? "selecionado" : "")">
+                                <input type="checkbox" checked="@exibirDesativados" @onchange="e => { exibirDesativados = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <span class="indicador-cor"></span> Desativados
+                            </label>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
 
@@ -57,33 +100,33 @@
             </div>
         }
 
-        @* ── CARDS DE RESUMO ── *@
+        @* ── CARDS DE RESUMO (Apenas produtos ATIVOS contam aqui) ── *@
         <div class="resumo-cards">
             <div class="resumo-card">
                 <div class="resumo-icon blue"><i class="bi bi-box-seam"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count</span>
-                    <span class="resumo-label">Produtos</span>
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Ativo)</span>
+                    <span class="resumo-label">Produtos Ativos</span>
                 </div>
             </div>
             <div class="resumo-card">
                 <div class="resumo-icon green"><i class="bi bi-check2-circle"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => ObterEstoque(p.ProdutoID)?.Quantidade > 0)</span>
-                    <span class="resumo-label">Em Estoque</span>
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Quantidade >= p.QuantidadeMinima && p.Quantidade > 0)</span>
+                    <span class="resumo-label">Estoque Normal</span>
                 </div>
             </div>
             <div class="resumo-card">
                 <div class="resumo-icon yellow"><i class="bi bi-exclamation-triangle"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => EstoqueAbaixoMinimo(p.ProdutoID))</span>
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Ativo && p.Quantidade > 0 && p.Quantidade < p.QuantidadeMinima)</span>
                     <span class="resumo-label">Abaixo do Mínimo</span>
                 </div>
             </div>
             <div class="resumo-card">
                 <div class="resumo-icon red"><i class="bi bi-slash-circle"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => ObterEstoque(p.ProdutoID)?.Quantidade == 0)</span>
+                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Ativo && p.Quantidade == 0)</span>
                     <span class="resumo-label">Sem Estoque</span>
                 </div>
             </div>
@@ -125,8 +168,7 @@
                         <tbody>
                             @foreach (var produto in produtosFiltrados)
                             {
-                                var estoque = ObterEstoque(produto.ProdutoID);
-                                var status  = ObterStatus(produto.ProdutoID);
+                                var status = ObterStatus(produto);
                                 <tr class="@(produto.Ativo ? "" : "row-inativo")">
                                     <td>
                                         <div class="produto-nome">@produto.Nome</div>
@@ -142,21 +184,27 @@
                                         <span class="qty-minima">@((int)produto.QuantidadeMinima)</span>
                                     </td>
                                     <td class="text-end fw-bold">R$ @produto.PrecoVenda.ToString()</td>
-                                    <td class="text-end text-muted-soft">R$ @produto.PrecoCusto.ToString()</td>
+                                    <td class="text-end text-muted-soft">R$ @(produto.PrecoCusto?.ToString() ?? "0,00")</td>
                                     <td class="text-center">
                                         <span class="status-pill @status.Classe">@status.Texto</span>
                                     </td>
                                     <td class="text-center">
                                         <div class="acoes-grupo">
-                                            <button class="btn-acao edit" title="Editar produto" @onclick="() => AbrirModalEdicao(produto)">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                            <button class="btn-acao stock" title="Ajustar estoque" @onclick="() => AbrirModalEstoque(produto)">
-                                                <i class="bi bi-clipboard2-plus"></i>
-                                            </button>
-                                            <button class="btn-acao delete" title="Excluir produto" @onclick="() => ConfirmarExclusao(produto)">
-                                                <i class="bi bi-trash3"></i>
-                                            </button>
+                                            @if (produto.Ativo)
+                                            {
+                                                <button class="btn-acao edit" title="Editar produto" @onclick="() => AbrirModalEdicao(produto)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn-acao delete" title="Excluir produto" @onclick="() => ConfirmarExclusao(produto)">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn-acao activate" title="Ativar produto" @onclick="() => AlternarStatusProduto(produto, true)">
+                                                    <i class="bi bi-power"></i>
+                                                </button>
+                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -205,11 +253,26 @@
                                 <label>Validade</label>
                                 <input type="date" @bind="formProduto.Validade" class="form-input" />
                             </div>
+
+                            @* Quantidade Mínima visível tanto na criação quanto na edição *@
+                            <div class="form-group">
+                                <label>Quantidade Mínima</label>
+                                <input type="number" @bind="formProduto.QuantidadeMinima" min="0" class="form-input" />
+                            </div>
+
                             @if (!editandoProduto)
                             {
                                 <div class="form-group">
                                     <label>Estoque Inicial</label>
                                     <input type="number" @bind="formProduto.EstoqueInicial" min="0" class="form-input" />
+                                </div>
+                            }
+                            else
+                            {
+                                @* Edição direta da quantidade atual de estoque ativada no fluxo do lápis *@
+                                <div class="form-group">
+                                    <label>Quantidade em Estoque</label>
+                                    <input type="number" @bind="formProduto.Quantidade" min="0" class="form-input" />
                                 </div>
                             }
                         </div>
@@ -225,7 +288,10 @@
                     <div class="modal-footer">
                         <button class="btn-action secondary" @onclick="FecharModalProduto">Cancelar</button>
                         <button class="btn-action primary" @onclick="SalvarProduto" disabled="@isSalvando">
-                            @if (isSalvando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            @if (isSalvando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
                             @(editandoProduto ? "Salvar Alterações" : "Criar Produto")
                         </button>
                     </div>
@@ -233,9 +299,7 @@
             </div>
         }
 
-        @* ══════════════════════════════════════════════
-           MODAL — AJUSTAR ESTOQUE
-           ══════════════════════════════════════════════ *@
+        @* ── MODAL — AJUSTAR ESTOQUE INDEPENDENTE ── *@
         @if (modalEstoqueAberto)
         {
             <div class="modal-overlay" @onclick="FecharModalEstoque">
@@ -276,7 +340,10 @@
                     <div class="modal-footer">
                         <button class="btn-action secondary" @onclick="FecharModalEstoque">Cancelar</button>
                         <button class="btn-action success" @onclick="SalvarEstoque" disabled="@isSalvando">
-                            @if (isSalvando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            @if (isSalvando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
                             Confirmar
                         </button>
                     </div>
@@ -284,9 +351,7 @@
             </div>
         }
 
-        @* ══════════════════════════════════════════════
-           MODAL — CONFIRMAR EXCLUSÃO
-           ══════════════════════════════════════════════ *@
+        @* ── MODAL — CONFIRMAR EXCLUSÃO ── *@
         @if (modalExclusaoAberto)
         {
             <div class="modal-overlay" @onclick="FecharModalExclusao">
@@ -305,7 +370,10 @@
                     <div class="modal-footer">
                         <button class="btn-action secondary" @onclick="FecharModalExclusao">Cancelar</button>
                         <button class="btn-action danger" @onclick="ExcluirProduto" disabled="@isSalvando">
-                            @if (isSalvando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            @if (isSalvando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
                             Excluir
                         </button>
                     </div>
@@ -316,227 +384,1012 @@
 </div>
 
 <style>
-    /* ── Container ── */
-    .estoque-container { padding: 24px; max-width: 1400px; margin: 0 auto; color: #fff; font-family: 'Inter', sans-serif; min-height: 90vh; }
-
-    /* ── Header ── */
-    .estoque-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 28px; flex-wrap: wrap; }
-    .header-left h2 { margin: 0; font-size: 1.8rem; font-weight: 800; display: flex; align-items: center; gap: 12px; }
-    .header-left h2 i { color: #007bff; }
-    .header-subtitle { color: rgba(255,255,255,0.45); font-size: 0.9rem; margin-top: 4px; display: block; }
-    .header-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-
-    /* ── Search ── */
-    .search-bar { display: flex; align-items: center; background: rgba(0,0,0,0.35); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 10px 18px; gap: 10px; min-width: 280px; transition: 0.25s; }
-    .search-bar:focus-within { border-color: #007bff; background: rgba(0,0,0,0.5); box-shadow: 0 0 20px rgba(0,123,255,0.15); }
-    .search-bar i { color: rgba(255,255,255,0.35); font-size: 1rem; flex-shrink: 0; }
-    .search-bar input { background: transparent; border: none; color: #fff; font-size: 0.95rem; outline: none; width: 100%; }
-    .btn-clear-search { background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer; padding: 0; display: flex; align-items: center; transition: 0.2s; }
-    .btn-clear-search:hover { color: #fff; }
-
-    /* ── Botão Novo Produto ── */
-    .btn-novo-produto { background: #007bff; border: none; color: #fff; padding: 12px 22px; border-radius: 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.25s; white-space: nowrap; }
-    .btn-novo-produto:hover { background: #0056b3; box-shadow: 0 8px 25px rgba(0,123,255,0.3); transform: translateY(-1px); }
-
-    /* ── Alertas ── */
-    .alert-estoque { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 12px; font-weight: 500; font-size: 0.95rem; margin-bottom: 20px; animation: fadeIn 0.3s ease; }
-    .alert-estoque.success { background: rgba(40,167,69,0.12); border: 1px solid rgba(40,167,69,0.3); color: #5dd879; }
-    .alert-estoque.error   { background: rgba(220,53,69,0.12);  border: 1px solid rgba(220,53,69,0.3);  color: #ff6b7d; }
-    .alert-estoque i { font-size: 1.1rem; flex-shrink: 0; }
-    .mt-3 { margin-top: 12px; }
-
-    /* ── Cards de Resumo ── */
-    .resumo-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .resumo-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; transition: 0.2s; }
-    .resumo-card:hover { background: rgba(255,255,255,0.07); transform: translateY(-2px); }
-    .resumo-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
-    .resumo-icon.blue   { background: rgba(0,123,255,0.15);   color: #007bff; }
-    .resumo-icon.green  { background: rgba(40,167,69,0.15);   color: #28a745; }
-    .resumo-icon.yellow { background: rgba(255,193,7,0.15);   color: #ffc107; }
-    .resumo-icon.red    { background: rgba(220,53,69,0.15);   color: #dc3545; }
-    .resumo-info { display: flex; flex-direction: column; }
-    .resumo-valor { font-size: 1.8rem; font-weight: 800; line-height: 1; }
-    .resumo-label { font-size: 0.8rem; color: rgba(255,255,255,0.45); margin-top: 4px; font-weight: 500; }
-
-    /* ── Card Principal ── */
-    .estoque-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 22px; overflow: hidden; }
-
-    /* ── States ── */
-    .loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; color: rgba(255,255,255,0.4); }
-    .empty-state i { font-size: 3.5rem; }
-    .empty-state h4 { color: #fff; margin: 0; font-weight: 700; }
-    .empty-state p { margin: 0; font-size: 1rem; text-align: center; }
-
-    /* ── Tabela ── */
-    .table-wrapper { overflow-x: auto; }
-    .tabela-estoque { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    .tabela-estoque thead tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
-    .tabela-estoque th { padding: 14px 16px; color: rgba(255,255,255,0.4); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-    .tabela-estoque td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
-    .tabela-estoque tbody tr { transition: background 0.15s; }
-    .tabela-estoque tbody tr:hover { background: rgba(255,255,255,0.03); }
-    .tabela-estoque tbody tr:last-child td { border-bottom: none; }
-    .row-inativo { opacity: 0.5; }
-
-    .produto-nome { font-weight: 600; color: #fff; }
-    .produto-meta { color: rgba(255,255,255,0.4); font-size: 0.8rem; }
-    .codigo-barras-pill { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 4px 10px; font-size: 0.82rem; font-family: monospace; color: rgba(255,255,255,0.6); white-space: nowrap; }
-    .text-muted-soft { color: rgba(255,255,255,0.4) !important; }
-    .fw-bold { font-weight: 700; }
-
-    /* ── Badges de quantidade ── */
-    .qty-badge { display: inline-block; min-width: 42px; text-align: center; padding: 5px 12px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; }
-    .qty-badge.ok      { background: rgba(40,167,69,0.12);  color: #5dd879; }
-    .qty-badge.baixo   { background: rgba(255,193,7,0.12);  color: #ffc107; }
-    .qty-badge.zerado  { background: rgba(220,53,69,0.12);  color: #ff6b7d; }
-    .qty-minima { color: rgba(255,255,255,0.35); font-size: 0.9rem; font-weight: 600; }
-
-    /* ── Status pill ── */
-    .status-pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
-    .status-pill.ok     { background: rgba(40,167,69,0.15);  color: #5dd879; border: 1px solid rgba(40,167,69,0.25); }
-    .status-pill.baixo  { background: rgba(255,193,7,0.15);  color: #ffc107; border: 1px solid rgba(255,193,7,0.25); }
-    .status-pill.zerado { background: rgba(220,53,69,0.15);  color: #ff6b7d; border: 1px solid rgba(220,53,69,0.25); }
-
-    /* ── Ações ── */
-    .acoes-grupo { display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .btn-acao { width: 36px; height: 36px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; transition: 0.2s; }
-    .btn-acao.edit   { background: rgba(0,123,255,0.1);  border-color: rgba(0,123,255,0.2);  color: #007bff; }
-    .btn-acao.stock  { background: rgba(40,167,69,0.1);  border-color: rgba(40,167,69,0.2);  color: #28a745; }
-    .btn-acao.delete { background: rgba(220,53,69,0.1);  border-color: rgba(220,53,69,0.2);  color: #dc3545; }
-    .btn-acao:hover { transform: scale(1.12); filter: brightness(1.3); }
-
-    /* ── Modais ── */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; animation: fadeIn 0.2s ease; }
-    .modal-card { background: #1a1f2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; width: 100%; max-width: 640px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; animation: modalSlide 0.25s ease-out; }
-    .modal-card-sm { max-width: 460px; }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-    .modal-header h4 { margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .btn-fechar-modal { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
-    .btn-fechar-modal:hover { background: rgba(220,53,69,0.15); color: #dc3545; border-color: rgba(220,53,69,0.3); }
-    .modal-body { padding: 24px 28px; overflow-y: auto; flex: 1; }
-    .modal-footer { padding: 18px 28px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end; gap: 10px; }
-
-    /* ── Formulário ── */
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    .form-group.span-2 { grid-column: span 2; }
-    .form-group label { font-size: 0.82rem; font-weight: 600; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
-    .form-input { background: rgba(0,0,0,0.3); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px; color: #fff; padding: 11px 16px; font-size: 0.95rem; outline: none; transition: 0.2s; width: 100%; box-sizing: border-box; }
-    .form-input:focus { border-color: #007bff; background: rgba(0,0,0,0.45); box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
-    .form-input-lg { font-size: 1.3rem; font-weight: 700; text-align: center; padding: 14px; }
-
-    /* ── Produto destaque no modal de estoque ── */
-    .produto-destaque-modal { display: flex; align-items: center; gap: 14px; background: rgba(0,123,255,0.07); border: 1px solid rgba(0,123,255,0.15); border-radius: 14px; padding: 16px 20px; }
-    .produto-destaque-modal i { font-size: 1.8rem; color: #007bff; flex-shrink: 0; }
-    .produto-destaque-modal div { display: flex; flex-direction: column; gap: 2px; }
-    .produto-destaque-modal strong { font-size: 1rem; font-weight: 700; }
-    .produto-destaque-modal small { color: rgba(255,255,255,0.4); font-size: 0.82rem; }
-
-    /* ── Modal de Exclusão ── */
-    .delete-icon-wrapper { width: 72px; height: 72px; background: rgba(220,53,69,0.12); border: 2px solid rgba(220,53,69,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
-    .delete-icon-wrapper i { font-size: 2rem; color: #dc3545; }
-    .delete-confirm-text { font-size: 1.05rem; font-weight: 600; margin: 0 0 8px; }
-    .delete-confirm-sub  { color: rgba(255,255,255,0.4); font-size: 0.9rem; margin: 0; }
-
-    /* ── Botões gerais ── */
-    .btn-action { padding: 11px 24px; border-radius: 12px; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.25s; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-    .btn-action.primary   { background: #007bff; color: #fff; }
-    .btn-action.primary:hover:not(:disabled) { background: #0056b3; box-shadow: 0 8px 20px rgba(0,123,255,0.3); }
-    .btn-action.secondary { background: rgba(255,255,255,0.07); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
-    .btn-action.secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
-    .btn-action.success   { background: #28a745; color: #fff; }
-    .btn-action.success:hover:not(:disabled) { background: #1e7e34; box-shadow: 0 8px 20px rgba(40,167,69,0.3); }
-    .btn-action.danger    { background: #dc3545; color: #fff; }
-    .btn-action.danger:hover:not(:disabled) { background: #b02a37; box-shadow: 0 8px 20px rgba(220,53,69,0.3); }
-    .btn-action:disabled  { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
-
-    /* ── Animações ── */
-    .animate-fade-in { animation: fadeIn 0.35s ease; }
-    @@keyframes fadeIn      { from { opacity: 0; }                       to { opacity: 1; } }
-    @@keyframes modalSlide  { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: none; } }
-
-    /* Custom scrollbar */
-    *::-webkit-scrollbar { width: 6px; height: 6px; }
-    *::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-    *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
-    *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
-
-    /* ════════════════════════════════════════════
-       RESPONSIVIDADE
-       ════════════════════════════════════════════ */
-
-    @@media (max-width: 1200px) {
-        .resumo-cards { grid-template-columns: repeat(2, 1fr); }
+    /* Estilos base mantidos do design anterior */
+    .estoque-container {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+        color: #fff;
+        font-family: 'Inter', sans-serif;
+        min-height: 90vh;
     }
 
-    @@media (max-width: 1024px) {
-        .estoque-container { padding: 16px; }
-        .header-left h2 { font-size: 1.5rem; }
-        .tabela-estoque th, .tabela-estoque td { padding: 12px 10px; }
-        /* Esconde preço de custo em telas médias */
-        .tabela-estoque th:nth-child(6),
-        .tabela-estoque td:nth-child(6) { display: none; }
+    .estoque-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 28px;
+        flex-wrap: wrap;
     }
 
-    @@media (max-width: 860px) {
-        .estoque-header { flex-direction: column; align-items: stretch; }
-        .header-actions { flex-direction: column; }
-        .search-bar { min-width: unset; width: 100%; }
-        .btn-novo-produto { justify-content: center; }
-        .resumo-cards { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .resumo-valor { font-size: 1.5rem; }
-        /* Esconde coluna de código em telas menores */
-        .tabela-estoque th:nth-child(2),
-        .tabela-estoque td:nth-child(2) { display: none; }
-        .form-grid { grid-template-columns: 1fr; }
-        .form-group.span-2 { grid-column: span 1; }
+    .header-left h2 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
 
-    @@media (max-width: 640px) {
-        .estoque-container { padding: 10px; }
-        .resumo-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .resumo-card { padding: 14px 16px; gap: 12px; border-radius: 14px; }
-        .resumo-icon { width: 40px; height: 40px; font-size: 1.2rem; border-radius: 10px; }
-        .resumo-valor { font-size: 1.3rem; }
-        /* Em telas muito pequenas esconde qtd mínima e status, mantém as essenciais */
-        .tabela-estoque th:nth-child(4),
-        .tabela-estoque td:nth-child(4) { display: none; }
-        .tabela-estoque th:nth-child(7),
-        .tabela-estoque td:nth-child(7) { display: none; }
-        .modal-card { border-radius: 16px; }
-        .modal-header, .modal-body, .modal-footer { padding-left: 18px; padding-right: 18px; }
+        .header-left h2 i {
+            color: #007bff;
+        }
+
+    .header-subtitle {
+        color: rgba(255,255,255,0.45);
+        font-size: 0.9rem;
+        margin-top: 4px;
+        display: block;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .search-bar {
+        display: flex;
+        align-items: center;
+        background: rgba(0,0,0,0.35);
+        border: 1.5px solid rgba(255,255,255,0.08);
+        border-radius: 14px;
+        padding: 10px 18px;
+        gap: 10px;
+        min-width: 280px;
+        transition: 0.25s;
+    }
+
+        .search-bar:focus-within {
+            border-color: #007bff;
+            background: rgba(0,0,0,0.5);
+            box-shadow: 0 0 20px rgba(0,123,255,0.15);
+        }
+
+        .search-bar i {
+            color: rgba(255,255,255,0.35);
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .search-bar input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            width: 100%;
+        }
+
+    .btn-clear-search {
+        background: none;
+        border: none;
+        color: rgba(255,255,255,0.35);
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        transition: 0.2s;
+    }
+
+        .btn-clear-search:hover {
+            color: #fff;
+        }
+
+    .btn-novo-produto {
+        background: #007bff;
+        border: none;
+        color: #fff;
+        padding: 12px 22px;
+        border-radius: 14px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: 0.25s;
+        white-space: nowrap;
+    }
+
+        .btn-novo-produto:hover {
+            background: #0056b3;
+            box-shadow: 0 8px 25px rgba(0,123,255,0.3);
+            transform: translateY(-1px);
+        }
+
+    .alert-estoque {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 20px;
+        border-radius: 12px;
+        font-weight: 500;
+        font-size: 0.95rem;
+        margin-bottom: 20px;
+        animation: fadeIn 0.3s ease;
+    }
+
+        .alert-estoque.success {
+            background: rgba(40,167,69,0.12);
+            border: 1px solid rgba(40,167,69,0.3);
+            color: #5dd879;
+        }
+
+        .alert-estoque.error {
+            background: rgba(220,53,69,0.12);
+            border: 1px solid rgba(220,53,69,0.3);
+            color: #ff6b7d;
+        }
+
+        .alert-estoque i {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+    .mt-3 {
+        margin-top: 12px;
+    }
+
+    .resumo-cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .resumo-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: 0.2s;
+    }
+
+        .resumo-card:hover {
+            background: rgba(255,255,255,0.07);
+            transform: translateY(-2px);
+        }
+
+    .resumo-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+
+        .resumo-icon.blue {
+            background: rgba(0,123,255,0.15);
+            color: #007bff;
+        }
+
+        .resumo-icon.green {
+            background: rgba(40,167,69,0.15);
+            color: #28a745;
+        }
+
+        .resumo-icon.yellow {
+            background: rgba(255,193,7,0.15);
+            color: #ffc107;
+        }
+
+        .resumo-icon.red {
+            background: rgba(220,53,69,0.15);
+            color: #dc3545;
+        }
+
+    .resumo-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .resumo-valor {
+        font-size: 1.8rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .resumo-label {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.45);
+        margin-top: 4px;
+        font-weight: 500;
+    }
+
+    .estoque-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 22px;
+        overflow: hidden;
+    }
+
+    .loading-state, .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 20px;
+        gap: 16px;
+        color: rgba(255,255,255,0.4);
+    }
+
+        .empty-state i {
+            font-size: 3.5rem;
+        }
+
+        .empty-state h4 {
+            color: #fff;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    .tabela-estoque {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+        .tabela-estoque thead tr {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .tabela-estoque th {
+            padding: 14px 16px;
+            color: rgba(255,255,255,0.4);
+            font-weight: 600;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .tabela-estoque td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            vertical-align: middle;
+        }
+
+        .tabela-estoque tbody tr {
+            transition: background 0.15s;
+        }
+
+            .tabela-estoque tbody tr:hover {
+                background: rgba(255,255,255,0.03);
+            }
+
+            .tabela-estoque tbody tr:last-child td {
+                border-bottom: none;
+            }
+
+    .row-inativo {
+        opacity: 0.45;
+        background: rgba(0,0,0,0.1);
+    }
+
+    .produto-nome {
+        font-weight: 600;
+        color: #fff;
+    }
+
+    .produto-meta {
+        color: rgba(255,255,255,0.4);
+        font-size: 0.8rem;
+    }
+
+    .codigo-barras-pill {
+        background: rgba(255,255,255,0.06);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 0.82rem;
+        font-family: monospace;
+        color: rgba(255,255,255,0.6);
+        white-space: nowrap;
+    }
+
+    .text-muted-soft {
+        color: rgba(255,255,255,0.4) !important;
+    }
+
+    .fw-bold {
+        font-weight: 700;
+    }
+
+    /* Classes de crachá de Status e Quantidade */
+    .qty-badge {
+        display: inline-block;
+        min-width: 42px;
+        text-align: center;
+        padding: 5px 12px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.95rem;
+    }
+
+        .qty-badge.ok {
+            background: rgba(40,167,69,0.12);
+            color: #5dd879;
+        }
+
+        .qty-badge.baixo {
+            background: rgba(255,193,7,0.12);
+            color: #ffc107;
+        }
+
+        .qty-badge.zerado {
+            background: rgba(220,53,69,0.12);
+            color: #ff6b7d;
+        }
+
+        .qty-badge.inativo {
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.3);
+        }
+
+    .qty-minima {
+        color: rgba(255,255,255,0.35);
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .status-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        white-space: nowrap;
+    }
+
+        .status-pill.ok {
+            background: rgba(40,167,69,0.15);
+            color: #5dd879;
+            border: 1px solid rgba(40,167,69,0.25);
+        }
+
+        .status-pill.baixo {
+            background: rgba(255,193,7,0.15);
+            color: #ffc107;
+            border: 1px solid rgba(255,193,7,0.25);
+        }
+
+        .status-pill.zerado {
+            background: rgba(220,53,69,0.15);
+            color: #ff6b7d;
+            border: 1px solid rgba(220,53,69,0.25);
+        }
+
+        .status-pill.inativo {
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.4);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+
+    /* Ações de linha */
+    .acoes-grupo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .btn-acao {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        transition: 0.2s;
+    }
+
+        .btn-acao.edit {
+            background: rgba(0,123,255,0.1);
+            border-color: rgba(0,123,255,0.2);
+            color: #007bff;
+        }
+
+        .btn-acao.stock {
+            background: rgba(40,167,69,0.1);
+            border-color: rgba(40,167,69,0.2);
+            color: #28a745;
+        }
+
+        .btn-acao.delete {
+            background: rgba(220,53,69,0.1);
+            border-color: rgba(220,53,69,0.2);
+            color: #dc3545;
+        }
+
+        .btn-acao:hover:not(:disabled) {
+            transform: scale(1.12);
+            filter: brightness(1.3);
+        }
+
+        /* Estado desativado/bloqueado dos botões de ação */
+        .btn-acao:disabled {
+            opacity: 0.15;
+            cursor: not-allowed;
+            pointer-events: none;
+            background: rgba(255,255,255,0.02);
+            border-color: transparent;
+            color: rgba(255,255,255,0.2);
+        }
+
+    /* Modal layout */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+        animation: fadeIn 0.2s ease;
+    }
+
+    .modal-card {
+        background: #1a1f2e;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 22px;
+        width: 100%;
+        max-width: 640px;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+        overflow: hidden;
+        animation: modalSlide 0.25s ease-out;
+    }
+
+    .modal-card-sm {
+        max-width: 460px;
+    }
+
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 28px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+        .modal-header h4 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+    .btn-fechar-modal {
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: rgba(255,255,255,0.6);
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.2s;
+        flex-shrink: 0;
+    }
+
+        .btn-fechar-modal:hover {
+            background: rgba(220,53,69,0.15);
+            color: #dc3545;
+            border-color: rgba(220,53,69,0.3);
+        }
+
+    .modal-body {
+        padding: 24px 28px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .modal-footer {
+        padding: 18px 28px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+        .form-group.span-2 {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.45);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+    .form-input {
+        background: rgba(0,0,0,0.3);
+        border: 1.5px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        color: #fff;
+        padding: 11px 16px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: 0.2s;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+        .form-input:focus {
+            border-color: #007bff;
+            background: rgba(0,0,0,0.45);
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+
+    .form-input-lg {
+        font-size: 1.3rem;
+        font-weight: 700;
+        text-align: center;
+        padding: 14px;
+    }
+
+    .produto-destaque-modal {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: rgba(0,123,255,0.07);
+        border: 1px solid rgba(0,123,255,0.15);
+        border-radius: 14px;
+        padding: 16px 20px;
+    }
+
+        .produto-destaque-modal i {
+            font-size: 1.8rem;
+            color: #007bff;
+            flex-shrink: 0;
+        }
+
+        .produto-destaque-modal div {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .produto-destaque-modal strong {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .produto-destaque-modal small {
+            color: rgba(255,255,255,0.4);
+            font-size: 0.82rem;
+        }
+
+    .delete-icon-wrapper {
+        width: 72px;
+        height: 72px;
+        background: rgba(220,53,69,0.12);
+        border: 2px solid rgba(220,53,69,0.25);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+    }
+
+        .delete-icon-wrapper i {
+            font-size: 2rem;
+            color: #dc3545;
+        }
+
+    .delete-confirm-text {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0 0 8px;
+    }
+
+    .delete-confirm-sub {
+        color: rgba(255,255,255,0.4);
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    .btn-action {
+        padding: 11px 24px;
+        border-radius: 12px;
+        border: none;
+        font-weight: 700;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: 0.25s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+        .btn-action.primary {
+            background: #007bff;
+            color: #fff;
+        }
+
+            .btn-action.primary:hover:not(:disabled) {
+                background: #0056b3;
+                box-shadow: 0 8px 20px rgba(0,123,255,0.3);
+            }
+
+        .btn-action.secondary {
+            background: rgba(255,255,255,0.07);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+            .btn-action.secondary:hover:not(:disabled) {
+                background: rgba(255,255,255,0.12);
+            }
+
+        .btn-action.success {
+            background: #28a745;
+            color: #fff;
+        }
+
+            .btn-action.success:hover:not(:disabled) {
+                background: #1e7e34;
+                box-shadow: 0 8px 20px rgba(40,167,69,0.3);
+            }
+
+        .btn-action.danger {
+            background: #dc3545;
+            color: #fff;
+        }
+
+            .btn-action.danger:hover:not(:disabled) {
+                background: #b02a37;
+                box-shadow: 0 8px 20px rgba(220,53,69,0.3);
+            }
+
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+    .animate-fade-in {
+        animation: fadeIn 0.35s ease;
+    }
+
+    /* ── Filtros de Status Checklist ── */
+    .status-filters-container {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        padding: 12px 20px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .filters-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: rgba(255, 255, 255, 0.4);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .filter-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.75);
+        user-select: none;
+        transition: color 0.2s;
+    }
+
+        .filter-label:hover {
+            color: #fff;
+        }
+
+        .filter-label input[type="checkbox"] {
+            accent-color: #007bff;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+        .status-dot.ok {
+            background: #5dd879;
+        }
+
+        .status-dot.baixo {
+            background: #ffc107;
+        }
+
+        .status-dot.zerado {
+            background: #ff6b7d;
+        }
+
+        .status-dot.inativo {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+    /* Ajuste de posicionamento do contêiner de ações */
+    .header-actions-container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+
+    /* Botão de abrir/fechar filtros */
+    .btn-filtro-toggle {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1.5px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.6);
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+        .btn-filtro-toggle:hover {
+            background: rgba(255, 255, 255, 0.09);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-filtro-toggle.ativo {
+            background: rgba(0, 123, 255, 0.15);
+            border-color: #007bff;
+            color: #007bff;
+        }
+
+    /* Painel Dropdown Flutuante Fino */
+    .painel-filtros-dropdown {
+        position: absolute;
+        top: 52px;
+        right: 0;
+        background: #161a26;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 6px 14px; /* Padding vertical enxuto */
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 99;
+        animation: slideDownPainel 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    .filtros-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.35);
+        letter-spacing: 0.6px;
+    }
+
+    .filtros-pills-grupo {
+        display: flex;
+        gap: 6px;
+    }
+
+    /* Pílulas Ultrafinas (Substitutos dos Checkboxes) */
+    .filtro-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px; /* Padding vertical reduzido para tirar o efeito gordinho */
+        border-radius: 8px; /* Bordas ligeiramente mais suaves */
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.4);
+        transition: all 0.15s ease;
+        user-select: none;
+        white-space: nowrap; /* ESSENCIAL: Impede que o texto quebre linhas */
+    }
+
+        .filtro-pill:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Estados Selecionados Sutilmente Coloridos */
+        .filtro-pill.status-ok.selecionado {
+            background: rgba(40, 167, 69, 0.08);
+            border-color: rgba(40, 167, 69, 0.3);
+            color: #5dd879;
+        }
+
+        .filtro-pill.status-baixo.selecionado {
+            background: rgba(255, 193, 7, 0.08);
+            border-color: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+
+        .filtro-pill.status-zerado.selecionado {
+            background: rgba(220, 53, 69, 0.08);
+            border-color: rgba(220, 53, 69, 0.3);
+            color: #ff6b7d;
+        }
+
+        .filtro-pill.status-inativo.selecionado {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
+    /* Pontos indicadores discretos */
+    .indicador-cor {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        transition: 0.15s;
+    }
+
+    .filtro-pill.status-ok.selecionado .indicador-cor {
+        background: #5dd879;
+    }
+
+    .filtro-pill.status-baixo.selecionado .indicador-cor {
+        background: #ffc107;
+    }
+
+    .filtro-pill.status-zerado.selecionado .indicador-cor {
+        background: #ff6b7d;
+    }
+
+    .filtro-pill.status-inativo.selecionado .indicador-cor {
+        background: rgba(255, 255, 255, 0.7);
+    }
+
+    .dropdown-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: transparent; 
+        z-index: 98; 
+    }
+
+    .btn-acao.activate {
+        background: rgba(40, 167, 69, 0.1);
+        border-color: rgba(40, 167, 69, 0.2);
+        color: #28a745;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes modalSlide {
+        from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.97);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+
+    @@keyframes slideDownPainel {
+        from {
+            opacity: 0;
+            transform: translateY(-6px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 </style>
 
 @code {
-    // ── Estado geral ──
-    private List<ProdutoDTO>  produtos          = new();
-    private List<EstoqueDTO>  estoques          = new();
-    private List<ProdutoDTO>  produtosFiltrados = new();
-    private string            termoBusca        = string.Empty;
-    private bool              isCarregando      = true;
-    private string            mensagemSucesso   = string.Empty;
-    private string            mensagemErro      = string.Empty;
+    private List<ProdutoDTO> produtos = new();
+    private List<EstoqueDTO> estoques = new();
+    private List<ProdutoDTO> produtosFiltrados = new();
+    private string termoBusca = string.Empty;
+    private bool isCarregando = true;
+    private string mensagemSucesso = string.Empty;
+    private string mensagemErro = string.Empty;
 
-    // ── Modais ──
-    private bool              modalProdutoAberto  = false;
-    private bool              modalEstoqueAberto  = false;
-    private bool              modalExclusaoAberto = false;
-    private bool              editandoProduto     = false;
-    private bool              isSalvando          = false;
-    private string            mensagemErroModal   = string.Empty;
+    // Modais
+    private bool modalProdutoAberto = false;
+    private bool modalEstoqueAberto = false;
+    private bool modalExclusaoAberto = false;
+    private bool editandoProduto = false;
+    private bool isSalvando = false;
+    private string mensagemErroModal = string.Empty;
 
-    // ── Seleção ──
-    private ProdutoDTO?       produtoSelecionado = null;
-    private EstoqueDTO?       estoqueSelecionado = null;
+    // Seleção
+    private ProdutoDTO? produtoSelecionado = null;
 
-    // ── Formulários ──
-    private FormProduto       formProduto  = new();
-    private FormEstoque       formEstoque  = new();
+    // Formulários
+    private FormProduto formProduto = new();
+    private FormEstoque formEstoque = new();
 
-    // ════════════════════════════════════════════
-    // LIFECYCLE
-    // ════════════════════════════════════════════
+    private bool exibirNormal = true;
+    private bool exibirBaixoMinimo = true;
+    private bool exibirSemEstoque = true;
+    private bool exibirDesativados = false;
+    private bool exibirPainelFiltros = false;
+
+    private void TogglePainelFiltros() => exibirPainelFiltros = !exibirPainelFiltros;
 
     protected override async Task OnInitializedAsync()
     {
@@ -556,10 +1409,9 @@
         try
         {
             produtos = await ProdutoService.GetAllAsync();
-            estoques = await EstoqueService.GetAllAsync();
             Filtrar();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             mensagemErro = "Erro ao carregar dados. Tente novamente.";
         }
@@ -569,11 +1421,8 @@
         }
     }
 
-    // ════════════════════════════════════════════
-    // FILTRO / BUSCA
-    // ════════════════════════════════════════════
-
     private void FiltrarProdutos() => Filtrar();
+
     private void LimparBusca()
     {
         termoBusca = string.Empty;
@@ -582,38 +1431,37 @@
 
     private void Filtrar()
     {
-        if (string.IsNullOrWhiteSpace(termoBusca))
-        {
-            produtosFiltrados = produtos.ToList();
-        }
-        else
+        IEnumerable<ProdutoDTO> query = produtos;
+
+        if (!string.IsNullOrWhiteSpace(termoBusca))
         {
             var t = termoBusca.Trim().ToLowerInvariant();
-            produtosFiltrados = produtos
-                .Where(p => p.Nome.ToLowerInvariant().Contains(t) ||
-                            (p.CodigoBarras ?? "").ToLowerInvariant().Contains(t))
-                .ToList();
+            query = query.Where(p => p.Nome.ToLowerInvariant().Contains(t) ||
+                                     (p.CodigoBarras ?? "").ToLowerInvariant().Contains(t));
         }
+
+        query = query.Where(p =>
+        {
+            if (!p.Ativo) return exibirDesativados;
+
+            var statusClasse = ObterStatus(p).Classe;
+            return statusClasse switch
+            {
+                "ok" => exibirNormal,
+                "baixo" => exibirBaixoMinimo,
+                "zerado" => exibirSemEstoque,
+                _ => true
+            };
+        });
+
+        produtosFiltrados = query.ToList();
     }
 
-    // ════════════════════════════════════════════
-    // HELPERS
-    // ════════════════════════════════════════════
-
-    private ProdutoDTO? ObterEstoque(int produtoId) =>
-        produtos.FirstOrDefault(e => e.ProdutoID == produtoId);
-
-    private bool EstoqueAbaixoMinimo(int produtoId)
+    private (string Classe, string Texto) ObterStatus(ProdutoDTO p)
     {
-        var e = ObterEstoque(produtoId);
-        return e != null && e.Quantidade > 0 && e.Quantidade < e.QuantidadeMinima;
-    }
-
-    private (string Classe, string Texto) ObterStatus(int produtoId)
-    {
-        var e = ObterEstoque(produtoId);
-        if (e == null || e.Quantidade == 0) return ("zerado", "Sem Estoque");
-        if (e.Quantidade < e.QuantidadeMinima)  return ("baixo",  "Abaixo do Mín.");
+        if (!p.Ativo) return ("inativo", "Desativado"); 
+        if (p.Quantidade == 0) return ("zerado", "Sem Estoque");
+        if (p.Quantidade < p.QuantidadeMinima) return ("baixo", "Abaixo do Mín.");
         return ("ok", "Normal");
     }
 
@@ -627,40 +1475,79 @@
     }
 
     // ════════════════════════════════════════════
-    // MODAL — PRODUTO
+    // MODAL — PRODUTO (NOVO / EDITAR)
     // ════════════════════════════════════════════
 
     private void AbrirModalNovoProduto()
     {
-        editandoProduto   = false;
+        editandoProduto = false;
         produtoSelecionado = null;
-        formProduto       = new();
+        formProduto = new FormProduto();
         mensagemErroModal = string.Empty;
         modalProdutoAberto = true;
     }
 
     private void AbrirModalEdicao(ProdutoDTO produto)
     {
-        editandoProduto   = true;
+        editandoProduto = true;
         produtoSelecionado = produto;
+
+        // Alimenta o formulário com dados cadastrais + dados de estoque para a edição unificada
         formProduto = new FormProduto
         {
-            Nome           = produto.Nome,
-            CodigoBarras   = produto.CodigoBarras,
-            UnidadeMedida  = produto.UnidadeMedida,
-            PrecoVenda     = produto.PrecoVenda,
-            PrecoCusto     = produto.PrecoCusto,
-            Validade       = produto.Validade,
+            Nome = produto.Nome,
+            CodigoBarras = produto.CodigoBarras,
+            UnidadeMedida = produto.UnidadeMedida,
+            PrecoVenda = produto.PrecoVenda,
+            PrecoCusto = produto.PrecoCusto,
+            Validade = produto.Validade,
+            QuantidadeMinima = (int)produto.QuantidadeMinima,
+            Quantidade = (int)produto.Quantidade,
             EstoqueInicial = 0
         };
-        mensagemErroModal  = string.Empty;
+        mensagemErroModal = string.Empty;
         modalProdutoAberto = true;
+    }
+
+    private async Task AlternarStatusProduto(ProdutoDTO produto, bool ativar)
+    {
+        isCarregando = true; 
+        mensagemErro = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+
+            await ProdutoService.UpdateAsync(produto.ProdutoID, new AtualizarProdutoDTO
+            {
+                Nome = produto.Nome,
+                CodigoBarras = produto.CodigoBarras,
+                UnidadeMedida = produto.UnidadeMedida,
+                PrecoVenda = produto.PrecoVenda,
+                PrecoCusto = produto.PrecoCusto,
+                Validade = produto.Validade,
+                Ativo = true
+            });
+
+            await CarregarDados();
+            string acaoTexto = ativar ? "ativado" : "desativado";
+            await ExibirSucesso($"Produto \"{produto.Nome}\" {acaoTexto} com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = "Erro ao alterar o status do produto. Tente novamente.";
+        }
+        finally
+        {
+            isCarregando = false;
+            StateHasChanged();
+        }
     }
 
     private void FecharModalProduto()
     {
         modalProdutoAberto = false;
-        mensagemErroModal  = string.Empty;
+        mensagemErroModal = string.Empty;
     }
 
     private async Task SalvarProduto()
@@ -677,38 +1564,55 @@
         {
             if (editandoProduto && produtoSelecionado != null)
             {
+                // 1. Atualiza dados principais do Produto
                 await ProdutoService.UpdateAsync(produtoSelecionado.ProdutoID, new AtualizarProdutoDTO
                 {
-                    Nome          = formProduto.Nome,
-                    CodigoBarras  = formProduto.CodigoBarras,
+                    Nome = formProduto.Nome,
+                    CodigoBarras = formProduto.CodigoBarras,
                     UnidadeMedida = formProduto.UnidadeMedida,
-                    PrecoVenda    = formProduto.PrecoVenda,
-                    PrecoCusto    = formProduto.PrecoCusto,
-                    Validade      = formProduto.Validade
+                    PrecoVenda = formProduto.PrecoVenda,
+                    PrecoCusto = formProduto.PrecoCusto,
+                    Validade = formProduto.Validade
                 });
+
+                // 2. Atualiza dados de Estoque (IEstoqueService entra em ação apenas para salvar a alteração)
+                var estoqueDto = new AtualizarEstoqueDTO
+                {
+                    ProdutoID = produtoSelecionado.ProdutoID,
+                    Quantidade = formProduto.Quantidade,
+                    QuantidadeMinima = formProduto.QuantidadeMinima
+                };
+
+                if (produtoSelecionado.EstoqueID > 0)
+                    await EstoqueService.UpdateAsync(produtoSelecionado.EstoqueID, estoqueDto);
+                else
+                    await EstoqueService.CreateAsync(estoqueDto);
+
                 FecharModalProduto();
                 await CarregarDados();
-                await ExibirSucesso($"Produto \"{formProduto.Nome}\" atualizado com sucesso.");
+                await ExibirSucesso($"Produto e estoque de \"{formProduto.Nome}\" atualizados com sucesso.");
             }
             else
             {
                 await ProdutoService.CreateAsync(new CriarProdutoDTO
                 {
-                    Nome           = formProduto.Nome,
-                    ComercioID =  (Convert.ToInt32(Session.CurrentCommerceId)),
-                    CodigoBarras   = formProduto.CodigoBarras,
-                    UnidadeMedida  = formProduto.UnidadeMedida,
-                    PrecoVenda     = formProduto.PrecoVenda,
-                    PrecoCusto     = formProduto.PrecoCusto,
-                    Validade       = formProduto.Validade,
-                    EstoqueInicial = formProduto.EstoqueInicial
+                    Nome = formProduto.Nome,
+                    ComercioID = (Convert.ToInt32(Session.CurrentCommerceId)),
+                    CodigoBarras = formProduto.CodigoBarras,
+                    UnidadeMedida = formProduto.UnidadeMedida,
+                    PrecoVenda = formProduto.PrecoVenda,
+                    PrecoCusto = formProduto.PrecoCusto,
+                    Validade = formProduto.Validade,
+                    EstoqueInicial = formProduto.EstoqueInicial,
+                    QuantidadeMinima = formProduto.QuantidadeMinima
                 });
+
                 FecharModalProduto();
                 await CarregarDados();
                 await ExibirSucesso($"Produto \"{formProduto.Nome}\" criado com sucesso.");
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             mensagemErroModal = "Erro ao salvar produto. Tente novamente.";
         }
@@ -718,46 +1622,28 @@
         }
     }
 
-    // ════════════════════════════════════════════
-    // MODAL — ESTOQUE
-    // ════════════════════════════════════════════
-
-    private void AbrirModalEstoque(ProdutoDTO produto)
-    {
-        produtoSelecionado = produto;
-        estoqueSelecionado = estoques.FirstOrDefault(x => x.ProdutoID == produto.ProdutoID);
-        formEstoque = new FormEstoque
-        {
-            Quantidade        = (int)produto?.Quantidade,
-            QuantidadeMinima  = (int)produto?.QuantidadeMinima
-        };
-        mensagemErroModal  = string.Empty;
-        modalEstoqueAberto = true;
-    }
-
     private void FecharModalEstoque()
     {
         modalEstoqueAberto = false;
-        mensagemErroModal  = string.Empty;
+        mensagemErroModal = string.Empty;
     }
 
     private async Task SalvarEstoque()
     {
         if (produtoSelecionado == null) return;
-
         isSalvando = true;
         mensagemErroModal = string.Empty;
         try
         {
             var dto = new AtualizarEstoqueDTO
             {
-                ProdutoID       = produtoSelecionado.ProdutoID,
-                Quantidade      = formEstoque.Quantidade,
+                ProdutoID = produtoSelecionado.ProdutoID,
+                Quantidade = formEstoque.Quantidade,
                 QuantidadeMinima = formEstoque.QuantidadeMinima
             };
 
-            if (estoqueSelecionado != null)
-                await EstoqueService.UpdateAsync(estoqueSelecionado.EstoqueID, dto);
+            if (produtoSelecionado.EstoqueID > 0)
+                await EstoqueService.UpdateAsync(produtoSelecionado.EstoqueID, dto);
             else
                 await EstoqueService.CreateAsync(dto);
 
@@ -781,7 +1667,7 @@
 
     private void ConfirmarExclusao(ProdutoDTO produto)
     {
-        produtoSelecionado  = produto;
+        produtoSelecionado = produto;
         modalExclusaoAberto = true;
     }
 
@@ -790,7 +1676,6 @@
     private async Task ExcluirProduto()
     {
         if (produtoSelecionado == null) return;
-
         isSalvando = true;
         try
         {
@@ -817,18 +1702,20 @@
 
     private class FormProduto
     {
-        public string   Nome           { get; set; } = string.Empty;
-        public string? CodigoBarras    { get; set; }
-        public string   UnidadeMedida  { get; set; } = string.Empty;
-        public decimal  PrecoVenda     { get; set; }
-        public decimal?  PrecoCusto     { get; set; }
-        public DateTime? Validade       { get; set; } = DateTime.Today.AddYears(1);
-        public int      EstoqueInicial { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string? CodigoBarras { get; set; }
+        public string UnidadeMedida { get; set; } = string.Empty;
+        public decimal PrecoVenda { get; set; }
+        public decimal? PrecoCusto { get; set; }
+        public DateTime? Validade { get; set; } = DateTime.Today.AddYears(1);
+        public int EstoqueInicial { get; set; }
+        public int QuantidadeMinima { get; set; }
+        public int Quantidade { get; set; }
     }
 
     private class FormEstoque
     {
-        public int Quantidade       { get; set; }
+        public int Quantidade { get; set; }
         public int QuantidadeMinima { get; set; }
     }
 }

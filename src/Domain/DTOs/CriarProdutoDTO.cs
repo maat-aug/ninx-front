@@ -11,4 +11,5 @@ public class CriarProdutoDTO
     public string   UnidadeMedida  { get; set; } = string.Empty;
     public DateTime? Validade       { get; set; }
     public int      EstoqueInicial { get; set; }
+    public int QuantidadeMinima { get; set; }
 }
