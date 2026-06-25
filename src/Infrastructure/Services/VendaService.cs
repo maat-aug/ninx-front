@@ -1,8 +1,10 @@
+using NinxERP.Components.Pages;
 using NinxERP.Domain.DTOs;
 using NinxERP.Domain.Interfaces;
 using NinxERP.Infrastructure.Config;
 using System;
 using System.Net.Http.Json;
+using static System.Net.WebRequestMethods;
 
 namespace NinxERP.Infrastructure.Services;
 
@@ -60,11 +62,11 @@ public class VendaService : IVendaService
         }
     }
 
-    public async Task<AssinaturaResponseDTO?> GetLinkAssinaturaAsync(Guid documentoGuid)
+    public async Task<AssinaturaRetornoDTO?> GetDocumentoById(Guid documentoGuid)
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<AssinaturaResponseDTO>(_config.GetEndpointUrl($"/api/AssinaturaEletronica/{documentoGuid}"));
+            return await _httpClient.GetFromJsonAsync<AssinaturaRetornoDTO>(_config.GetEndpointUrl($"/api/AssinaturaEletronica/{documentoGuid}"));
         }
         catch
         {
@@ -96,6 +98,17 @@ public class VendaService : IVendaService
         {
             return false;
         }
+    }
+
+    public async Task<IEnumerable<VendaHistoricoDTO>> BuscarVendaPorCliente(int clienteId)
+    {
+        var response = await _httpClient.GetFromJsonAsync<List<VendaHistoricoDTO>>(_config.GetEndpointUrl($"/api/Venda/cliente/{clienteId}"));
+        if (response == null ||  !(response.Count > 0))
+        {
+            return new List<VendaHistoricoDTO>();
+        }
+
+        return response;
     }
 
     public async Task<bool> VerificarDocumentoAssinadoAsync(Guid documentoGuid)

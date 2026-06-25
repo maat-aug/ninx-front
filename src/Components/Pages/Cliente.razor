@@ -2,6 +2,7 @@
 @using NinxERP.Domain.DTOs
 @using NinxERP.Domain.Interfaces
 @inject IClienteService ClienteService
+@inject IVendaService VendaService
 @inject UserSession Session
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -135,20 +136,26 @@
             else
             {
                 <div class="table-wrapper">
+
                     <table class="tabela-estoque">
                         <thead>
                             <tr>
                                 <th>Nome</th>
                                 <th>Telefone</th>
-                                <th>Limite de Crédito</th>
+                                <th class="text-end">Quanto Deve</th>
+                                <th class="text-end">Limite Crédito</th>
+                                <th class="text-end">Disponível</th>
                                 <th class="text-center">Status</th>
-                                <th>Criado Em</th>
                                 <th class="text-center">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var cliente in paginatedResult.Data)
                             {
+                                decimal quantoDeveMock = 150.50m; 
+                                decimal limite = cliente.LimiteCredito ?? 0m;
+                                decimal disponivel = limite - quantoDeveMock;
+
                                 <tr class="@(cliente.Ativo ? "" : "row-inativo")">
                                     <td>
                                         <div class="produto-nome">@cliente.Nome</div>
@@ -157,26 +164,37 @@
                                     <td>
                                         <span class="codigo-barras-pill">@(string.IsNullOrEmpty(cliente.Telefone) ? "—" : cliente.Telefone)</span>
                                     </td>
-                                    <td class="fw-bold">
+
+                                    @* NOVAS COLUNAS FINANCEIRAS *@
+                                    <td class="text-end fw-bold" style="color: #ff6b7d;">
+                                        @quantoDeveMock.ToString("C")
+                                    </td>
+                                    <td class="text-end fw-bold">
                                         @if (cliente.LimiteCredito.HasValue)
                                         {
-                                            <span style="color: #5dd879;">@cliente.LimiteCredito.Value.ToString("C")</span>
+                                            <span style="color: #5dd879;">@limite.ToString("C")</span>
                                         }
                                         else
                                         {
                                             <span class="text-muted-soft">Sem limite</span>
                                         }
                                     </td>
+                                    <td class="text-end fw-bold" style="color: #007bff;">
+                                        @(cliente.LimiteCredito.HasValue? disponivel.ToString("C") : "—")
+                                    </td>
+
                                     <td class="text-center">
                                         <span class="status-pill @(cliente.Ativo ? "ok" : "zerado")">
                                             @(cliente.Ativo ? "Ativo" : "Inativo")
                                         </span>
                                     </td>
-                                    <td class="text-muted-soft" style="font-size: 0.85rem;">
-                                        @cliente.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
-                                    </td>
                                     <td class="text-center">
                                         <div class="acoes-grupo">
+                                            @* NOVO BOTÃO DE HISTÓRICO *@
+                                            <button class="btn-acao history" @onclick="() => AbrirModalHistorico(cliente)" title="Histórico de Vendas">
+                                                <i class="bi bi-clock-history"></i>
+                                            </button>
+
                                             <button class="btn-acao edit" @onclick="() => AbrirModalEditar(cliente)" title="Editar">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
@@ -189,6 +207,7 @@
                             }
                         </tbody>
                     </table>
+
                 </div>
             }
         </div>
@@ -217,6 +236,72 @@
                     <button class="btn-paginacao" @onclick="() => MudarPagina(paginatedResult.PageNumber + 1)" disabled="@(!paginatedResult.HasNextPage)">
                         Próxima <i class="bi bi-chevron-right"></i>
                     </button>
+                </div>
+            </div>
+        }
+
+        @* ── MODAL — HISTÓRICO DE VENDAS ── *@
+        @if (modalHistoricoAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalHistorico">
+                <div class="modal-card" style="max-width: 800px;" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4><i class="bi bi-receipt"></i> Histórico de Vendas - @clienteSelecionado?.Nome</h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalHistorico"><i class="bi bi-x-lg"></i></button>
+                    </div>
+
+                    <div class="modal-body">
+                        @if (isCarregandoHistorico)
+                        {
+                            <div class="loading-state">
+                                <div class="spinner-border text-primary" style="width:2rem;height:2rem;"></div>
+                                <p>Buscando histórico...</p>
+                            </div>
+                        }
+                        else if (!vendasHistorico.Any())
+                        {
+                            <div class="empty-state">
+                                <i class="bi bi-inbox text-muted"></i>
+                                <h4>Nenhuma venda encontrada</h4>
+                                <p>Este cliente ainda não possui histórico de compras.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-wrapper" style="max-height: 400px;">
+                            
+                                <table class="tabela-estoque">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-center">Documento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var venda in vendasHistorico)
+                                        {
+                                            <tr>
+                                                <td>@venda.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                                <td>@venda.Status</td>
+                                                <td class="text-end fw-bold">@venda.Total.ToString("C")</td>
+                                                <td class="text-center">
+                                                <button class="btn-action secondary" style="padding: 6px 12px; font-size: 0.8rem;" @onclick="() => BaixarDocumentoPdf(venda.DocumentoGuid)" disabled="@isBaixandoDoc">
+                                                    <i class="bi bi-file-earmark-pdf text-danger"></i> PDF
+                                                </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalHistorico">Fechar</button>
+                    </div>
                 </div>
             </div>
         }
@@ -319,6 +404,9 @@
 </div>
 
 @code {
+
+
+
     private PaginatedResponse<ClienteDTO>? paginatedResult;
     private ClienteDTO? clienteSelecionado;
 
@@ -343,6 +431,11 @@
     private int totalAtivos = 0;
     private int totalInativos = 0;
     private string limiteCreditoFormatado { get; set; } = "0,00";
+
+    private bool modalHistoricoAberto = false;
+    private bool isCarregandoHistorico = false;
+    private bool isBaixandoDoc = false;
+    private List<VendaHistoricoDTO> vendasHistorico = new();
 
     private FormCliente formModel = new();
 
@@ -547,6 +640,69 @@
         finally
         {
             isSalvando = false;
+        }
+    }
+
+    private async Task AbrirModalHistorico(ClienteDTO cliente)
+    {
+        clienteSelecionado = cliente;
+        modalHistoricoAberto = true;
+        isCarregandoHistorico = true;
+        vendasHistorico.Clear();
+
+        try
+        {
+            var resultado = await VendaService.BuscarVendaPorCliente(cliente.ClienteID);
+
+            vendasHistorico = resultado.ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Erro ao buscar histórico: " + ex.Message);
+        }
+        finally
+        {
+            isCarregandoHistorico = false;
+        }
+    }
+
+    private void FecharModalHistorico()
+    {
+        modalHistoricoAberto = false;
+    }
+
+    private async Task BaixarDocumentoPdf(Guid guid)
+    {
+        if (isBaixandoDoc) return;
+        isBaixandoDoc = true;
+
+        try
+        {
+
+            // Busca o Base64 na API
+
+            var response = await VendaService.GetDocumentoById(guid);
+
+            if (response != null && !string.IsNullOrEmpty(response.DocumentoBase64))
+            {
+                var jsScript = $@"
+                    var link = document.createElement('a');
+                    link.download = 'Venda_Fiado_{Convert.ToString(guid).Substring(0, 8)}.pdf';
+                    link.href = 'data:application/pdf;base64,{response.DocumentoBase64}';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);";
+
+                await JS.InvokeVoidAsync("eval", jsScript);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Erro ao baixar documento: " + ex.Message);
+        }
+        finally
+        {
+            isBaixandoDoc = false;
         }
     }
 
