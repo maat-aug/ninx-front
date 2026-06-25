@@ -16,16 +16,30 @@ public class ProdutoService : IProdutoService
         _config = config;
     }
 
-    public async Task<PaginatedResponse<ProdutoDTO>?> GetProdutosEstoqueByComercioIdAsync(int pageNumber, int pageSize, string? tipoFiltro)
+    public async Task<PaginatedResponse<ProdutoDTO>?> GetProdutosEstoqueByComercioIdAsync(
+        int pageNumber,
+        int pageSize,
+        List<string> statusFiltros,
+        string termoBusca)
     {
         try
         {
-            var url = _config.GetEndpointUrl($"/api/Produto/GetAllPaginated?PageNumber={pageNumber}&PageSize={pageSize}&TipoFiltro={tipoFiltro}");
+            var queryParams = $"PageNumber={pageNumber}&PageSize={pageSize}&TermoBusca={Uri.EscapeDataString(termoBusca ?? "")}";
+
+            if (statusFiltros != null)
+            {
+                foreach (var status in statusFiltros)
+                {
+                    queryParams += $"&Status={status}";
+                }
+            }
+
+            var url = _config.GetEndpointUrl($"/api/Produto/GetAllPaginated?{queryParams}");
             return await _httpClient.GetFromJsonAsync<PaginatedResponse<ProdutoDTO>>(url);
         }
         catch
         {
-            return null;
+            return new PaginatedResponse<ProdutoDTO>();
         }
     }
 

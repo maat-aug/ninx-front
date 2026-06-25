@@ -40,7 +40,7 @@
                         <i class="bi bi-search"></i>
                         <input type="text"
                                value="@termoBusca"
-                               @oninput="e => { termoBusca = e.Value?.ToString() ?? string.Empty; FiltrarProdutos(); }"
+                               @oninput="async e => { termoBusca = e.Value?.ToString() ?? string.Empty; await FiltrarProdutos(); }"
                                placeholder="Buscar por nome ou código de barras..." />
                         @if (!string.IsNullOrEmpty(termoBusca))
                         {
@@ -62,22 +62,22 @@
                         <span class="filtros-label">Status:</span>
                         <div class="filtros-pills-grupo">
                             <label class="filtro-pill status-ok @(exibirNormal ? "selecionado" : "")">
-                                <input type="checkbox" checked="@exibirNormal" @onchange="e => { exibirNormal = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <input type="checkbox" checked="@exibirNormal" @onchange="async e => { exibirNormal = (bool)e.Value!; await OnCheckboxChanged(); }" style="display:none;" />
                                 <span class="indicador-cor"></span> Normal
                             </label>
 
                             <label class="filtro-pill status-baixo @(exibirBaixoMinimo ? "selecionado" : "")">
-                                <input type="checkbox" checked="@exibirBaixoMinimo" @onchange="e => { exibirBaixoMinimo = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <input type="checkbox" checked="@exibirBaixoMinimo" @onchange="async e => { exibirBaixoMinimo = (bool)e.Value!; await OnCheckboxChanged(); }" style="display:none;" />
                                 <span class="indicador-cor"></span> Abaixo do Mínimo
                             </label>
 
                             <label class="filtro-pill status-zerado @(exibirSemEstoque ? "selecionado" : "")">
-                                <input type="checkbox" checked="@exibirSemEstoque" @onchange="e => { exibirSemEstoque = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <input type="checkbox" checked="@exibirSemEstoque" @onchange="async e => { exibirSemEstoque = (bool)e.Value!; await OnCheckboxChanged(); }" style="display:none;" />
                                 <span class="indicador-cor"></span> Sem Estoque
                             </label>
 
                             <label class="filtro-pill status-inativo @(exibirDesativados ? "selecionado" : "")">
-                                <input type="checkbox" checked="@exibirDesativados" @onchange="e => { exibirDesativados = (bool)e.Value!; Filtrar(); }" style="display:none;" />
+                                <input type="checkbox" checked="@exibirDesativados" @onchange="async e => { exibirDesativados = (bool)e.Value!; await OnCheckboxChanged(); }" style="display:none;" />
                                 <span class="indicador-cor"></span> Desativados
                             </label>
                         </div>
@@ -101,32 +101,37 @@
         }
 
         @* ── CARDS DE RESUMO (Apenas produtos ATIVOS contam aqui) ── *@
+        @* ── CARDS DE RESUMO DE ESTOQUE GLOBAL ── *@
         <div class="resumo-cards">
             <div class="resumo-card">
                 <div class="resumo-icon blue"><i class="bi bi-box-seam"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Ativo)</span>
+                    @* Exibe o total global mapeado da API *@
+                    <span class="resumo-valor">@totalAtivos</span>
                     <span class="resumo-label">Produtos Ativos</span>
                 </div>
             </div>
             <div class="resumo-card">
                 <div class="resumo-icon green"><i class="bi bi-check2-circle"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Quantidade >= p.QuantidadeMinima && p.Quantidade > 0)</span>
+                    @* Exibe o total global mapeado da API *@
+                    <span class="resumo-valor">@totalNormal</span>
                     <span class="resumo-label">Estoque Normal</span>
                 </div>
             </div>
             <div class="resumo-card">
                 <div class="resumo-icon yellow"><i class="bi bi-exclamation-triangle"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Ativo && p.Quantidade > 0 && p.Quantidade < p.QuantidadeMinima)</span>
+                    @* Exibe o total global mapeado da API *@
+                    <span class="resumo-valor">@totalBaixo</span>
                     <span class="resumo-label">Abaixo do Mínimo</span>
                 </div>
             </div>
             <div class="resumo-card">
                 <div class="resumo-icon red"><i class="bi bi-slash-circle"></i></div>
                 <div class="resumo-info">
-                    <span class="resumo-valor">@produtosFiltrados.Count(p => p.Ativo && p.Quantidade == 0)</span>
+                    @* Exibe o total global mapeado da API *@
+                    <span class="resumo-valor">@totalZerado</span>
                     <span class="resumo-label">Sem Estoque</span>
                 </div>
             </div>
@@ -412,7 +417,6 @@
 </div>
 
 <style>
-    /* Estilos base mantidos do design anterior */
     .estoque-container {
         padding: 24px;
         max-width: 1400px;
@@ -636,7 +640,6 @@
     .estoque-card {
         background: rgba(255,255,255,0.04);
         border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 22px;
         overflow: hidden;
     }
 
@@ -668,7 +671,29 @@
 
     .table-wrapper {
         overflow-x: auto;
+        max-height: 480px; 
+        overflow-y: auto; 
     }
+
+        .table-wrapper::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5); 
+            border-radius: 10px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: #6366f1; 
+            border-radius: 10px;
+            transition: background 0.3s ease;
+        }
+
+            .table-wrapper::-webkit-scrollbar-thumb:hover {
+                background: #4f46e5; 
+            }
 
     .tabela-estoque {
         width: 100%;
@@ -1475,7 +1500,11 @@
     private int paginaAtual = 1;
     private int itensPorPagina = 10;
     private int totalItens = 0;
-    private int totalPaginas => (int)Math.Ceiling((double)totalItens / itensPorPagina);
+    private int totalPaginas = 0;
+    private int totalAtivos = 0;
+    private int totalNormal = 0;
+    private int totalBaixo = 0;
+    private int totalZerado = 0;
     // Modais
     private bool modalProdutoAberto = false;
     private bool modalEstoqueAberto = false;
@@ -1510,33 +1539,56 @@
         await CarregarDados();
     }
 
-private async Task CarregarDados()
+    private async Task CarregarDados()
     {
         isCarregando = true;
-        mensagemErro = string.Empty;
         StateHasChanged();
 
         try
         {
-            var request = new { PageNumber = paginaAtual, PageSize = itensPorPagina };
-            var resultado = await ProdutoService.GetProdutosEstoqueByComercioIdAsync(paginaAtual, itensPorPagina, filtroSelecionado);
-            if (resultado != null)
+            var filtrosAtivos = new List<string>();
+            if (exibirNormal) filtrosAtivos.Add("ok");
+            if (exibirBaixoMinimo) filtrosAtivos.Add("baixo");
+            if (exibirSemEstoque) filtrosAtivos.Add("zerado");
+            if (exibirDesativados) filtrosAtivos.Add("desativados");
+
+            var resultado = await ProdutoService.GetProdutosEstoqueByComercioIdAsync(
+                paginaAtual, 
+                itensPorPagina, 
+                filtrosAtivos, 
+                termoBusca
+            );
+
+            if (resultado != null && resultado.TotalRecords > 0)
             {
-                produtos = resultado.Data ?? new List<ProdutoDTO>();
+                produtosFiltrados = resultado.Data;
                 totalItens = resultado.TotalRecords; 
-                
-                produtosFiltrados = produtos; 
+
+                totalAtivos = resultado.TotalAtivos;
+                totalNormal = resultado.TotalNormal;
+                totalBaixo = resultado.TotalBaixo;
+                totalZerado = resultado.TotalZerado;
+                totalPaginas = resultado.TotalPages;
+            } else{
+                produtosFiltrados = new List<ProdutoDTO>();
             }
         }
         catch (Exception ex)
         {
-            mensagemErro = "Erro ao carregar os produtos do estoque.";
+            mensagemErro = "Erro ao carregar os produtos.";
+            produtosFiltrados = new List<ProdutoDTO>();
         }
         finally
         {
             isCarregando = false;
             StateHasChanged();
         }
+    }
+
+    private async Task OnCheckboxChanged()
+    {
+        paginaAtual = 1; 
+        await CarregarDados();
     }
 
     private async Task MudarPagina(int novaPagina)
@@ -1555,40 +1607,17 @@ private async Task CarregarDados()
         await CarregarDados(); 
     }
 
-    private void FiltrarProdutos() => Filtrar();
-
-    private void LimparBusca()
+    private async Task FiltrarProdutos()
     {
-        termoBusca = string.Empty;
-        Filtrar();
+        paginaAtual = 1; 
+        await CarregarDados();
     }
 
-    private void Filtrar()
+    private async Task LimparBusca()
     {
-        IEnumerable<ProdutoDTO> query = produtos;
-
-        if (!string.IsNullOrWhiteSpace(termoBusca))
-        {
-            var t = termoBusca.Trim().ToLowerInvariant();
-            query = query.Where(p => p.Nome.ToLowerInvariant().Contains(t) ||
-                                     (p.CodigoBarras ?? "").ToLowerInvariant().Contains(t));
-        }
-
-        query = query.Where(p =>
-        {
-            if (!p.Ativo) return exibirDesativados;
-
-            var statusClasse = ObterStatus(p).Classe;
-            return statusClasse switch
-            {
-                "ok" => exibirNormal,
-                "baixo" => exibirBaixoMinimo,
-                "zerado" => exibirSemEstoque,
-                _ => true
-            };
-        });
-
-        produtosFiltrados = query.ToList();
+        termoBusca = string.Empty;
+        paginaAtual = 1;
+        await CarregarDados();
     }
 
     private (string Classe, string Texto) ObterStatus(ProdutoDTO p)
