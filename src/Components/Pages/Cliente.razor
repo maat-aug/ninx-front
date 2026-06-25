@@ -1,0 +1,560 @@
+@page "/mainpage/clientes"
+@using NinxERP.Domain.DTOs
+@using NinxERP.Domain.Interfaces
+@inject IClienteService ClienteService
+@inject UserSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Clientes — Ninx</PageTitle>
+
+<div class="estoque-container">
+    @if (!Session.IsAuthenticated)
+    {
+        <div class="auth-guard">
+            <p>Acesso negado. Redirecionando...</p>
+        </div>
+    }
+    else
+    {
+        @* ── CABEÇALHO COM FILTRO RETRÁTIL SLIM ── *@
+        <div class="estoque-header">
+            <div class="header-left">
+                <h2><i class="bi bi-people"></i> Gerenciamento de Clientes</h2>
+                <span class="header-subtitle">Cadastre e gerencie os clientes e limites de crédito</span>
+            </div>
+
+            <div class="header-actions-container">
+                <div class="header-actions">
+                    <button class="btn-filtro-toggle @(exibirPainelFiltros ? "ativo" : "")"
+                            @onclick="TogglePainelFiltros"
+                            title="Filtrar por Status">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+
+                    <div class="search-bar">
+                        <i class="bi bi-search"></i>
+                        <input type="text"
+                               value="@termoBusca"
+                               @oninput="OnBuscaInput"
+                               placeholder="Buscar por nome ou telefone..." />
+                        @if (!string.IsNullOrEmpty(termoBusca))
+                        {
+                            <button class="btn-clear-search" @onclick="LimparBusca">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        }
+                    </div>
+
+                    <button class="btn-novo-produto" @onclick="AbrirModalNovo">
+                        <i class="bi bi-plus-lg"></i> Novo Cliente
+                    </button>
+                </div>
+
+                @* Mini Painel de Filtros *@
+                @if (exibirPainelFiltros)
+                {
+                    <div class="dropdown-overlay" @onclick="() => exibirPainelFiltros = false"></div>
+                    <div class="painel-filtros-dropdown">
+                        <span class="filtros-label">Status:</span>
+                        <div class="filtros-pills-grupo">
+                            <label class="filtro-pill @(filtroStatus == "ativos" ? "selecionado" : "")">
+                                <input type="radio" name="statusFiltro" checked="@(filtroStatus == "ativos")" @onchange='() => AlterarStatusFiltro("ativos")' style="display:none;" />
+                                <span class="indicador-cor" style="background: #5dd879;"></span> Ativos
+                            </label>
+                            <label class="filtro-pill @(filtroStatus == "inativos" ? "selecionado" : "")">
+                                <input type="radio" name="statusFiltro" checked="@(filtroStatus == "inativos")" @onchange='() => AlterarStatusFiltro("inativos")' style="display:none;" />
+                                <span class="indicador-cor" style="background: #ff6b7d;"></span> Inativos
+                            </label>
+                            <label class="filtro-pill @(filtroStatus == "todos" ? "selecionado" : "")">
+                                <input type="radio" name="statusFiltro" checked="@(filtroStatus == "todos")" @onchange='() => AlterarStatusFiltro("todos")' style="display:none;" />
+                                <span class="indicador-cor" style="background: rgba(255,255,255,0.4);"></span> Todos
+                            </label>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── ALERTAS ── *@
+        @if (!string.IsNullOrEmpty(mensagemSucesso))
+        {
+            <div class="alert-estoque success animate-fade-in">
+                <i class="bi bi-check-circle-fill"></i> @mensagemSucesso
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(mensagemErro))
+        {
+            <div class="alert-estoque error animate-fade-in">
+                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErro
+            </div>
+        }
+
+        @* ── CARDS DE RESUMO ── *@
+        <div class="resumo-cards">
+            <div class="resumo-card">
+                <div class="resumo-icon blue"><i class="bi bi-people"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@totalClientes</span>
+                    <span class="resumo-label">Total de Clientes</span>
+                </div>
+            </div>
+            <div class="resumo-card">
+                <div class="resumo-icon green"><i class="bi bi-person-check"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@totalAtivos</span>
+                    <span class="resumo-label">Clientes Ativos</span>
+                </div>
+            </div>
+            <div class="resumo-card">
+                <div class="resumo-icon red"><i class="bi bi-person-dash"></i></div>
+                <div class="resumo-info">
+                    <span class="resumo-valor">@totalInativos</span>
+                    <span class="resumo-label">Clientes Inativos</span>
+                </div>
+            </div>
+        </div>
+
+        @* ── TABELA PRINCIPAL ── *@
+        <div class="estoque-card">
+            @if (loading)
+            {
+                <div class="loading-state">
+                    <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem;"></div>
+                    <p>Carregando clientes...</p>
+                </div>
+            }
+            else if (paginatedResult == null || !paginatedResult.Data.Any())
+            {
+                <div class="empty-state">
+                    <i class="bi bi-people"></i>
+                    <h4>Nenhum cliente encontrado</h4>
+                    <p>@(string.IsNullOrEmpty(termoBusca) ? "Adicione o primeiro cliente clicando em \"Novo Cliente\"." : "Tente outro termo de busca.")</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-wrapper">
+                    <table class="tabela-estoque">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Telefone</th>
+                                <th>Limite de Crédito</th>
+                                <th class="text-center">Status</th>
+                                <th>Criado Em</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var cliente in paginatedResult.Data)
+                            {
+                                <tr class="@(cliente.Ativo ? "" : "row-inativo")">
+                                    <td>
+                                        <div class="produto-nome">@cliente.Nome</div>
+                                        <small class="produto-meta">@cliente.ComercioNome</small>
+                                    </td>
+                                    <td>
+                                        <span class="codigo-barras-pill">@(string.IsNullOrEmpty(cliente.Telefone) ? "—" : cliente.Telefone)</span>
+                                    </td>
+                                    <td class="fw-bold">
+                                        @if (cliente.LimiteCredito.HasValue)
+                                        {
+                                            <span style="color: #5dd879;">@cliente.LimiteCredito.Value.ToString("C")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted-soft">Sem limite</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="status-pill @(cliente.Ativo ? "ok" : "zerado")">
+                                            @(cliente.Ativo ? "Ativo" : "Inativo")
+                                        </span>
+                                    </td>
+                                    <td class="text-muted-soft" style="font-size: 0.85rem;">
+                                        @cliente.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="acoes-grupo">
+                                            <button class="btn-acao edit" @onclick="() => AbrirModalEditar(cliente)" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn-acao delete" @onclick="() => AbrirModalExcluir(cliente)" title="Excluir">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        @* ── CONTROLES DE PAGINAÇÃO ── *@
+        @if (paginatedResult != null && paginatedResult.TotalPages > 1)
+        {
+            <div class="paginacao-container">
+                <div class="paginacao-info">
+                    Exibindo página <strong>@paginatedResult.PageNumber</strong> de <strong>@paginatedResult.TotalPages</strong> (Total de @paginatedResult.TotalRecords clientes)
+                </div>
+                <div class="paginacao-botoes">
+                    <button class="btn-paginacao" @onclick="() => MudarPagina(paginatedResult.PageNumber - 1)" disabled="@(!paginatedResult.HasPreviousPage)">
+                        <i class="bi bi-chevron-left"></i> Anterior
+                    </button>
+
+                    @for (int i = 1; i <= paginatedResult.TotalPages; i++)
+                    {
+                        var paginaNumero = i;
+                        <button class="btn-paginacao-numero @(paginaNumero == paginatedResult.PageNumber ? "ativo" : "")"
+                                @onclick="() => MudarPagina(paginaNumero)">
+                            @paginaNumero
+                        </button>
+                    }
+
+                    <button class="btn-paginacao" @onclick="() => MudarPagina(paginatedResult.PageNumber + 1)" disabled="@(!paginatedResult.HasNextPage)">
+                        Próxima <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        }
+
+        @* ══════════════════════════════════════════════
+           MODAL — NOVO / EDITAR CLIENTE
+           ══════════════════════════════════════════════ *@
+        @if (modalCadastroAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalCadastro">
+                <div class="modal-card" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4>
+                            <i class="bi @(isEdicao ? "bi-pencil-square" : "bi-plus-circle")"></i>
+                            @(isEdicao ? "Editar Cliente" : "Novo Cliente")
+                        </h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalCadastro"><i class="bi bi-x-lg"></i></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="form-grid">
+                            <div class="form-group span-2">
+                                <label>Nome Completo / Razão Social</label>
+                                <input type="text" @bind="formModel.Nome" placeholder="Ex: João Silva" class="form-input" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Telefone</label>
+                                <input type="text" @bind="formModel.Telefone" placeholder="Ex: (11) 99999-9999" class="form-input" />
+                            </div>
+
+                            <div class="form-group">
+                                <label>Limite de Crédito</label>
+                                <input type="text"
+                                       class="form-input"
+                                       value="@limiteCreditoFormatado"
+                                       @oninput="OnLimiteCreditoInput" />
+                            </div>
+
+                            <div class="form-group span-2 mt-2">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" @bind="formModel.Ativo" style="accent-color: #007bff; width: 16px; height: 16px;" />
+                                    Cliente Ativo
+                                </label>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensagemErroModal))
+                        {
+                            <div class="alert-estoque error mt-3">
+                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroModal
+                            </div>
+                        }
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalCadastro">Cancelar</button>
+                        <button class="btn-action primary" @onclick="SalvarCliente" disabled="@isSalvando">
+                            @if (isSalvando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @(isEdicao ? "Salvar Alterações" : "Criar Cliente")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* ── MODAL — CONFIRMAR EXCLUSÃO ── *@
+        @if (modalExclusaoAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalExclusao">
+                <div class="modal-card modal-card-sm" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4><i class="bi bi-trash3 text-danger"></i> Excluir Cliente</h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalExclusao"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="modal-body text-center" style="padding: 32px 24px;">
+                        <div class="delete-icon-wrapper">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+                        <p class="delete-confirm-text">Tem certeza que deseja excluir <strong>@clienteSelecionado?.Nome</strong>?</p>
+                        <p class="delete-confirm-sub">Esta ação não pode ser desfeita caso existam vínculos.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalExclusao">Cancelar</button>
+                        <button class="btn-action danger" @onclick="ExcluirCliente" disabled="@isSalvando">
+                            @if (isSalvando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private PaginatedResponse<ClienteDTO>? paginatedResult;
+    private ClienteDTO? clienteSelecionado;
+
+    private int paginaAtual = 1;
+    private const int ItensPorPagina = 10;
+
+    private bool loading = true;
+    private bool isSalvando = false;
+    private bool exibirPainelFiltros = false;
+    private bool modalCadastroAberto = false;
+    private bool modalExclusaoAberto = false;
+    private bool isEdicao = false;
+
+    private string termoBusca = string.Empty;
+    private string filtroStatus = "todos";
+    private string mensagemSucesso = string.Empty;
+    private string mensagemErro = string.Empty;
+    private string mensagemErroModal = string.Empty;
+
+    // ── Contadores para os cards de resumo ──
+    private int totalClientes = 0;
+    private int totalAtivos = 0;
+    private int totalInativos = 0;
+    private string limiteCreditoFormatado { get; set; } = "0,00";
+
+    private FormCliente formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        loading = true;
+        try
+        {
+            paginatedResult = await ClienteService.GetPagedAsync(paginaAtual, ItensPorPagina, termoBusca, filtroStatus);
+            await AtualizarResumo();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = "Erro ao carregar lista de clientes.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task AtualizarResumo()
+    {
+        try
+        {
+            var todos = await ClienteService.GetPagedAsync(1, int.MaxValue, string.Empty, "todos");
+            if (todos != null)
+            {
+                totalClientes  = todos.TotalRecords;
+                totalAtivos    = todos.Data.Count(c => c.Ativo);
+                totalInativos  = todos.Data.Count(c => !c.Ativo);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task MudarPagina(int novaPagina)
+    {
+        paginaAtual = novaPagina;
+        await CarregarDados();
+    }
+
+    private string FormatarMask(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return "0,00";
+        var apenasDigitos = new string(valor.Where(char.IsDigit).ToArray()).TrimStart('0');
+        if (string.IsNullOrEmpty(apenasDigitos)) return "0,00";
+        if (apenasDigitos.Length == 1) return "0,0" + apenasDigitos;
+        if (apenasDigitos.Length == 2) return "0," + apenasDigitos;
+
+        var decPart = apenasDigitos.Substring(apenasDigitos.Length - 2);
+        var intPart = apenasDigitos.Substring(0, apenasDigitos.Length - 2);
+
+        if (decimal.TryParse(intPart, out decimal v))
+            intPart = v.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")).Replace(".", "");
+
+        return intPart + "," + decPart;
+    }
+
+    private decimal ParseDecimal(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return 0;
+        var v = valor.Replace(",", ".");
+        return decimal.TryParse(v, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out decimal r) ? r : 0;
+    }
+
+    private void OnLimiteCreditoInput(ChangeEventArgs e)
+    {
+        limiteCreditoFormatado = FormatarMask(e.Value?.ToString() ?? "");
+
+        formModel.LimiteCredito = ParseDecimal(limiteCreditoFormatado);
+    }
+
+    private async Task OnBuscaInput(ChangeEventArgs e)
+    {
+        termoBusca = e.Value?.ToString() ?? string.Empty;
+        paginaAtual = 1;
+        await CarregarDados();
+    }
+
+    private async Task LimparBusca()
+    {
+        termoBusca = string.Empty;
+        paginaAtual = 1;
+        await CarregarDados();
+    }
+
+    private async Task AlterarStatusFiltro(string status)
+    {
+        filtroStatus = status;
+        paginaAtual = 1;
+        await CarregarDados();
+    }
+
+    private void TogglePainelFiltros() => exibirPainelFiltros = !exibirPainelFiltros;
+
+    private void AbrirModalNovo()
+    {
+        isEdicao = false;
+        mensagemErroModal = string.Empty;
+        formModel = new FormCliente();
+        modalCadastroAberto = true;
+    }
+
+    private void AbrirModalEditar(ClienteDTO cliente)
+    {
+        isEdicao = true;
+        mensagemErroModal = string.Empty;
+        clienteSelecionado = cliente;
+        formModel = new FormCliente
+        {
+            Nome = cliente.Nome,
+            Telefone = cliente.Telefone,
+            LimiteCredito = cliente.LimiteCredito,
+            Ativo = cliente.Ativo
+        };
+        modalCadastroAberto = true;
+    }
+
+    private void FecharModalCadastro() => modalCadastroAberto = false;
+
+    private async Task SalvarCliente()
+    {
+        isSalvando = true;
+        mensagemErroModal = string.Empty;
+        try
+        {
+            if (isEdicao && clienteSelecionado != null)
+            {
+                clienteSelecionado.Nome = formModel.Nome;
+                clienteSelecionado.Telefone = formModel.Telefone;
+                clienteSelecionado.LimiteCredito = formModel.LimiteCredito;
+                clienteSelecionado.Ativo = formModel.Ativo;
+
+                await ClienteService.UpdateAsync(clienteSelecionado);
+                mensagemSucesso = $"Cliente \"{formModel.Nome}\" atualizado.";
+            }
+            else
+            {
+                var novo = new ClienteDTO
+                {
+                    Nome = formModel.Nome,
+                    Telefone = formModel.Telefone,
+                    LimiteCredito = formModel.LimiteCredito,
+                    Ativo = formModel.Ativo,
+                    ComercioID = Convert.ToInt32(Session.CurrentCommerceId)
+                };
+                await ClienteService.CreateAsync(novo);
+                mensagemSucesso = $"Cliente \"{formModel.Nome}\" cadastrado.";
+            }
+            FecharModalCadastro();
+            await CarregarDados();
+        }
+        catch
+        {
+            mensagemErroModal = "Erro ao salvar o cliente.";
+        }
+        finally
+        {
+            isSalvando = false;
+        }
+    }
+
+    private void AbrirModalExcluir(ClienteDTO cliente)
+    {
+        clienteSelecionado = cliente;
+        modalExclusaoAberto = true;
+    }
+
+    private void FecharModalExclusao() => modalExclusaoAberto = false;
+
+    private async Task ExcluirCliente()
+    {
+        if (clienteSelecionado == null) return;
+        isSalvando = true;
+        try
+        {
+            await ClienteService.DeleteAsync(clienteSelecionado.ClienteID);
+            mensagemSucesso = "Cliente excluído com sucesso.";
+            FecharModalExclusao();
+            await CarregarDados();
+        }
+        catch
+        {
+            mensagemErro = "Não foi possível deletar o cliente.";
+            FecharModalExclusao();
+        }
+        finally
+        {
+            isSalvando = false;
+        }
+    }
+
+    private class FormCliente
+    {
+        public string Nome { get; set; } = string.Empty;
+        public string? Telefone { get; set; }
+        public decimal? LimiteCredito { get; set; }
+        public bool Ativo { get; set; } = true;
+    }
+}

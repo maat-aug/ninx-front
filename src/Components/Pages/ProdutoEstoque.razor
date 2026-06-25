@@ -275,12 +275,21 @@
                                 <input type="text" @bind="formProduto.UnidadeMedida" placeholder="Ex: UN, KG, L" class="form-input" />
                             </div>
                             <div class="form-group">
-                                <label>Preço de Venda (R$)</label>
-                                <input type="number" step="0.01" @bind="formProduto.PrecoVenda" class="form-input" />
+                                <label>Preço de Venda</label>
+                                <input type="text"
+                                       class="form-input"
+                                       value="@precoVendaFormatado"
+                                       @oninput="OnPrecoVendaInput"
+                                       placeholder="0,00" />
                             </div>
+
                             <div class="form-group">
-                                <label>Preço de Custo (R$)</label>
-                                <input type="number" step="0.01" @bind="formProduto.PrecoCusto" class="form-input" />
+                                <label>Preço de Custo</label>
+                                <input type="text"
+                                       class="form-input"
+                                       value="@precoCustoFormatado"
+                                       @oninput="OnPrecoCustoInput"
+                                       placeholder="0,00" />
                             </div>
                             <div class="form-group">
                                 <label>Validade</label>
@@ -1868,17 +1877,60 @@
         public string Nome { get; set; } = string.Empty;
         public string? CodigoBarras { get; set; }
         public string UnidadeMedida { get; set; } = string.Empty;
+
         public decimal PrecoVenda { get; set; }
-        public decimal? PrecoCusto { get; set; }
+        public decimal? PrecoCusto { get; set; } 
+
         public DateTime? Validade { get; set; } = DateTime.Today.AddYears(1);
         public int EstoqueInicial { get; set; }
         public int QuantidadeMinima { get; set; }
-        public int Quantidade { get; set; }
+        public int CategoriaID { get; set; }
+        public bool Ativo { get; set; } = true;
+        public int Quantidade {get; set;}
     }
 
-    private class FormEstoque
+    public class FormEstoque
     {
         public int Quantidade { get; set; }
         public int QuantidadeMinima { get; set; }
+    }
+    private string precoVendaFormatado { get; set; } = "0,00";
+    private string precoCustoFormatado { get; set; } = "0,00";
+
+    private void OnPrecoVendaInput(ChangeEventArgs e)
+    {
+        precoVendaFormatado = FormatarMask(e.Value?.ToString() ?? "");
+        formProduto.PrecoVenda = ParseDecimal(precoVendaFormatado);
+    }
+
+    private void OnPrecoCustoInput(ChangeEventArgs e)
+    {
+        precoCustoFormatado = FormatarMask(e.Value?.ToString() ?? "");
+        formProduto.PrecoCusto = ParseDecimal(precoCustoFormatado);
+    }
+
+    private string FormatarMask(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return "0,00";
+        var apenasDigitos = new string(valor.Where(char.IsDigit).ToArray()).TrimStart('0');
+        if (string.IsNullOrEmpty(apenasDigitos)) return "0,00";
+        if (apenasDigitos.Length == 1) return "0,0" + apenasDigitos;
+        if (apenasDigitos.Length == 2) return "0," + apenasDigitos;
+
+        var decPart = apenasDigitos.Substring(apenasDigitos.Length - 2);
+        var intPart = apenasDigitos.Substring(0, apenasDigitos.Length - 2);
+
+        if (decimal.TryParse(intPart, out decimal v))
+            intPart = v.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")).Replace(".", "");
+
+        return intPart + "," + decPart;
+    }
+
+    private decimal ParseDecimal(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return 0;
+        var v = valor.Replace(",", ".");
+        return decimal.TryParse(v, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out decimal r) ? r : 0;
     }
 }

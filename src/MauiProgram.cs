@@ -44,6 +44,7 @@ public static class MauiProgram
         builder.Services.AddScoped<IVendaService, VendaService>();
         builder.Services.AddScoped<IProdutoService, ProdutoService>();
         builder.Services.AddScoped<IEstoqueService, EstoqueService>();
+        builder.Services.AddScoped<IClienteService, ClienteService>();
         builder.Services.AddSingleton<SessionService>();
 
 #if DEBUG

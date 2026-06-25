@@ -1,11 +1,5 @@
 namespace NinxERP.Domain.DTOs;
 
-public class ClienteDTO
-{
-    public int clienteID { get; set; }
-    public string Nome { get; set; } = string.Empty;
-}
-
 public class VendaRequestDTO
 {
     public int ComercioID { get; set; }

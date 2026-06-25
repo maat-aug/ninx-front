@@ -61,7 +61,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(_apiConfig.GetEndpointUrl("/api/TrocarComercio"), new { comercioId });
+            var response = await _httpClient.PostAsJsonAsync(_apiConfig.GetEndpointUrl($"/api/TrocarComercio/{comercioId}"), "");
             
             if (response.IsSuccessStatusCode)
             {

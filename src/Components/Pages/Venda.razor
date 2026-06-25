@@ -980,7 +980,7 @@
         {
             ComercioID  = Session.CurrentCommerceId != null ? int.Parse(Session.CurrentCommerceId) : 0,
             UsuarioID   = Session.CurrentUser?.Id ?? 0,
-            ClienteID   = clienteSelecionado?.clienteID ?? 0,
+            ClienteID   = clienteSelecionado?.ClienteID ?? 0,
             TipoVenda   = tipoVendaSelecionado,
             ItensVenda  = carrinho,
             Pagamentos  = new List<PagamentoDTO>
