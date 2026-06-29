@@ -12,5 +12,6 @@ public interface IVendaService
     Task<bool> DesistirVendaAsync(int vendaId);
     Task<bool> VerificarDocumentoAssinadoAsync(Guid documentoGuid);
     Task<IEnumerable<VendaHistoricoDTO>> BuscarVendaPorCliente(int clienteId);
-
+    Task<Guid> ReceberPagamentoGeralFiadoAsync(int clienteId, decimal valorTotalPago, int formaPagamento);
+    Task<Guid> ReceberPagamentoFiadoAsync(int vendaId, decimal valorPago, int formaPagamento);
 }

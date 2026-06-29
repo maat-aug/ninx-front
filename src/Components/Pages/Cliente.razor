@@ -246,7 +246,12 @@
             <div class="modal-overlay" @onclick="FecharModalHistorico">
                 <div class="modal-card" style="max-width: 800px;" @onclick:stopPropagation="true">
                     <div class="modal-header">
-                        <h4><i class="bi bi-receipt"></i> Histórico de Vendas - @clienteSelecionado?.Nome</h4>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <h4><i class="bi bi-receipt"></i> Histórico de Vendas - @clienteSelecionado?.Nome</h4>
+                            <button class="btn-action primary" style="padding: 6px 14px; font-size: 0.85rem;" @onclick="AbrirModalPagamentoGeral">
+                                <i class="bi bi-cash-coin"></i> Receber Pagamento Global
+                            </button>
+                        </div>
                         <button class="btn-fechar-modal" @onclick="FecharModalHistorico"><i class="bi bi-x-lg"></i></button>
                     </div>
 
@@ -282,16 +287,88 @@
                                     <tbody>
                                         @foreach (var venda in vendasHistorico)
                                         {
+                                            @* ── LINHA PRINCIPAL DA VENDA ── *@
                                             <tr>
                                                 <td>@venda.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                                                 <td>@venda.Status</td>
                                                 <td class="text-end fw-bold">@venda.Total.ToString("C")</td>
                                                 <td class="text-center">
-                                                <button class="btn-action secondary" style="padding: 6px 12px; font-size: 0.8rem;" @onclick="() => BaixarDocumentoPdf(venda.DocumentoGuid)" disabled="@isBaixandoDoc">
-                                                    <i class="bi bi-file-earmark-pdf text-danger"></i> PDF
-                                                </button>
+                                                    <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+
+                                                        @* 1. Botão do PDF Original da Venda (Usa o FirstOrDefault que é o contrato inicial) *@
+                                                        <button class="btn-action secondary" style="padding: 6px 12px; font-size: 0.8rem;"
+                                                                @onclick="() => BaixarDocumentoPdf(venda.DocumentoGuid.FirstOrDefault())"
+                                                                disabled="@(isBaixandoDoc || !venda.DocumentoGuid.Any())"
+                                                                title="Baixar PDF Original da Venda">
+                                                            <i class="bi bi-file-earmark-pdf text-danger"></i> PDF Venda
+                                                        </button>
+
+                                                        <button class="btn-action secondary" style="padding: 6px 12px; font-size: 0.8rem; background: rgba(40, 167, 69, 0.1); border-color: rgba(40, 167, 69, 0.2);"
+                                                                @onclick="() => AbrirModalPagamentoIndividual(venda)"
+                                                                title="Pagar esta venda">
+                                                            <i class="bi bi-cash text-success"></i> Pagar
+                                                        </button>
+
+                                                        @* 2. Botão Setinha para Abrir/Fechar os Pagamentos (Dropable) *@
+                                                        @* 2. Botão Setinha para Abrir/Fechar os Pagamentos (Exibe APENAS se houver mais de um documento) *@
+                                                        @if (venda.DocumentoGuid != null && venda.DocumentoGuid.Count() > 1)
+                                                        {
+                                                            <button class="btn-action secondary" style="padding: 6px 10px; font-size: 0.8rem; background: rgba(255,255,255,0.05);"
+                                                                    @onclick="() => ToggleExpandirVenda(venda.VendaID)">
+                                                                <i class="bi @(vendaExpandidaId == venda.VendaID ? "bi-chevron-up text-info" : "bi-chevron-down")"></i>
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            @* Opcional: Renderiza um espaço vazio ou um ícone desabilitado discretamente para manter o alinhamento da tabela *@
+                                                            <div style="width: 32px;"></div>
+                                                        }
+                                                    </div>
                                                 </td>
                                             </tr>
+
+                                            @* ── SUB-LINHA (DROPABLE) COM HISTÓRICO DE PAGAMENTOS ── *@
+                                            @if (vendaExpandidaId == venda.VendaID)
+                                            {
+                                                <tr style="background-color: rgba(14, 165, 233, 0.03); border-left: 3px solid #0ea5e9;">
+                                                    <td colspan="4" style="padding: 12px 20px;">
+                                                        <div style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+                                                            <h5 style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0ea5e9; display: flex; align-items: center; gap: 6px;">
+                                                                <i class="bi bi-cash-stack"></i> Comprovantes e Pagamentos Vinculados
+                                                            </h5>
+
+                                                            @if (venda.DocumentoGuid != null && venda.DocumentoGuid.Count() > 1)
+                                                            {
+                                                                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                                                                    @* Ignoramos o primeiro da lista (.Skip(1)), pois o primeiro é o PDF original da venda *@
+                                                                    @{
+                                                                        int indexPagamento = 1;
+                                                                    }
+                                                                    @foreach (var guid in venda.DocumentoGuid.Skip(1))
+                                                                    {
+                                                                        <div style="display: flex; align-items: center; justify-content: space-between; background: #1a1d24; padding: 6px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                                                                            <span><i class="bi bi-check2-circle text-success"></i> Recibo de Amortização de Dívida #@indexPagamento</span>
+
+                                                                            <button class="btn-action secondary" style="padding: 4px 10px; font-size: 0.75rem;"
+                                                                                    @onclick="() => BaixarDocumentoPdf(guid)"
+                                                                                    disabled="@isBaixandoDoc">
+                                                                                <i class="bi bi-file-earmark-pdf text-danger"></i> Baixar Recibo
+                                                                            </button>
+                                                                        </div>
+                                                                        indexPagamento++;
+                                                                    }
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div style="padding: 6px 0; color: rgba(255,255,255,0.4); font-style: italic;">
+                                                                    Nenhum pagamento ou amortização parcial foi registrado para esta venda ainda.
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
                                         }
                                     </tbody>
                                 </table>
@@ -400,43 +477,89 @@
                 </div>
             </div>
         }
+
+        @* ── MODAL — RECEBER PAGAMENTO GERAL FIADO ── *@
+        @if (modalPagamentoGeralAberto)
+        {
+            <div class="modal-overlay" @onclick="FecharModalPagamentoGeral">
+                <div class="modal-card modal-card-sm" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h4><i class="bi bi-cash-coin text-success"></i> Pagamento Global</h4>
+                        <button class="btn-fechar-modal" @onclick="FecharModalPagamentoGeral"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-grid">
+                            <div class="form-group span-2">
+                                <label>Valor Total Pago (R$)</label>
+                                <input type="number" step="0.01" @bind="valorGlobalPago" class="form-input" placeholder="0,00" />
+                            </div>
+                            <div class="form-group span-2">
+                                <label>Forma de Pagamento</label>
+                                <select @bind="formaPagamentoSelecionada" class="form-input" style="background-color: #1a1d24;">
+                                    <option value="1">Dinheiro</option>
+                                    <option value="2">Cartão de Crédito</option>
+                                    <option value="3">Cartão de Débito</option>
+                                    <option value="4">PIX</option>
+                                </select>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(mensagemErroPagamento))
+                        {
+                            <div class="alert-estoque error mt-3">
+                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroPagamento
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-action secondary" @onclick="FecharModalPagamentoGeral">Cancelar</button>
+                        <button class="btn-action primary" @onclick="ProcessarPagamentoGeral" disabled="@isProcessandoPagamento">
+                            @if (isProcessandoPagamento)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Confirmar Quitação
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
     }
 </div>
 
 @code {
 
 
-
+    private VendaHistoricoDTO? vendaSelecionadaParaPagamento = null;
+    private bool isPagamentoGlobal = true;
     private PaginatedResponse<ClienteDTO>? paginatedResult;
     private ClienteDTO? clienteSelecionado;
-
     private int paginaAtual = 1;
     private const int ItensPorPagina = 10;
-
     private bool loading = true;
     private bool isSalvando = false;
     private bool exibirPainelFiltros = false;
     private bool modalCadastroAberto = false;
     private bool modalExclusaoAberto = false;
     private bool isEdicao = false;
-
     private string termoBusca = string.Empty;
     private string filtroStatus = "todos";
     private string mensagemSucesso = string.Empty;
     private string mensagemErro = string.Empty;
     private string mensagemErroModal = string.Empty;
-
-    // ── Contadores para os cards de resumo ──
+    private bool modalPagamentoGeralAberto = false;
+    private bool isProcessandoPagamento = false;
+    private decimal valorGlobalPago;
+    private int formaPagamentoSelecionada = 1;
+    private string mensagemErroPagamento = string.Empty;
     private int totalClientes = 0;
     private int totalAtivos = 0;
     private int totalInativos = 0;
     private string limiteCreditoFormatado { get; set; } = "0,00";
-
+    private int? vendaExpandidaId = null;
     private bool modalHistoricoAberto = false;
     private bool isCarregandoHistorico = false;
     private bool isBaixandoDoc = false;
     private List<VendaHistoricoDTO> vendasHistorico = new();
-
     private FormCliente formModel = new();
 
     protected override async Task OnInitializedAsync()
@@ -483,6 +606,14 @@
         catch
         {
         }
+    }
+
+    private void ToggleExpandirVenda(int vendaId)
+    {
+        if (vendaExpandidaId == vendaId)
+            vendaExpandidaId = null; 
+        else
+            vendaExpandidaId = vendaId; 
     }
 
     private async Task MudarPagina(int novaPagina)
@@ -703,6 +834,80 @@
         finally
         {
             isBaixandoDoc = false;
+        }
+    }
+
+    private void FecharModalPagamentoGeral() => modalPagamentoGeralAberto = false;
+
+    private void AbrirModalPagamentoGeral()
+    {
+        vendaSelecionadaParaPagamento = null;
+        isPagamentoGlobal = true;
+        mensagemErroPagamento = string.Empty;
+        valorGlobalPago = 0;
+        formaPagamentoSelecionada = 1;
+        modalPagamentoGeralAberto = true;
+    }
+
+    private void AbrirModalPagamentoIndividual(VendaHistoricoDTO venda)
+    {
+        vendaSelecionadaParaPagamento = venda;
+        isPagamentoGlobal = false;
+        mensagemErroPagamento = string.Empty;
+        
+        valorGlobalPago = venda.Total; 
+        formaPagamentoSelecionada = 1;
+        modalPagamentoGeralAberto = true;
+    }
+
+    private async Task ProcessarPagamentoGeral()
+    {
+        if (clienteSelecionado == null) return;
+        if (valorGlobalPago <= 0)
+        {
+            mensagemErroPagamento = "Insira um valor maior que zero.";
+            return;
+        }
+
+        isProcessandoPagamento = true;
+        mensagemErroPagamento = string.Empty;
+
+        try
+        {
+            Guid documentoGuid;
+
+            if (isPagamentoGlobal)
+            {
+                documentoGuid = await VendaService.ReceberPagamentoGeralFiadoAsync(
+                    clienteSelecionado.ClienteID, 
+                    valorGlobalPago, 
+                    formaPagamentoSelecionada
+                );
+                mensagemSucesso = "Pagamento global distribuído com sucesso!";
+            }
+            else
+            {
+                documentoGuid = await VendaService.ReceberPagamentoFiadoAsync(
+                    vendaSelecionadaParaPagamento!.VendaID,
+                    valorGlobalPago,
+                    formaPagamentoSelecionada
+                );
+                mensagemSucesso = $"Pagamento da venda #{vendaSelecionadaParaPagamento.VendaID} processado!";
+            }
+            
+            FecharModalPagamentoGeral();
+            FecharModalHistorico();
+            await CarregarDados();
+
+            await BaixarDocumentoPdf(documentoGuid);
+        }
+        catch (Exception ex)
+        {
+            mensagemErroPagamento = "Erro ao processar pagamento: " + ex.Message;
+        }
+        finally
+        {
+            isProcessandoPagamento = false;
         }
     }
 

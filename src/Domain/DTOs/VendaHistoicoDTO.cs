@@ -9,6 +9,6 @@
         public string TipoVenda { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime CriadoEm { get; set; }
-        public Guid DocumentoGuid { get; set; } 
+        public IEnumerable<Guid> DocumentoGuid { get; set; } 
     }
 }

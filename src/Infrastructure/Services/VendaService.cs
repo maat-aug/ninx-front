@@ -123,4 +123,44 @@ public class VendaService : IVendaService
             return false;
         }
     }
+
+    public async Task<Guid> ReceberPagamentoGeralFiadoAsync(int clienteId, decimal valorTotalPago, int formaPagamento)
+    {
+        var requestDto = new ReceberPagamentoGeralFiadoRequest
+        {
+            ValorPago = valorTotalPago,
+            FormaPagamento = formaPagamento
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(_config.GetEndpointUrl($"api/Venda/cliente/{clienteId}/pagamento-geral-fiado"), requestDto);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var guidResult = await response.Content.ReadFromJsonAsync<Guid>();
+            return guidResult;
+        }
+
+        var erroTexto = await response.Content.ReadAsStringAsync();
+        throw new Exception(!string.IsNullOrEmpty(erroTexto) ? erroTexto : "Erro desconhecido ao processar o pagamento global.");
+    }
+
+    public async Task<Guid> ReceberPagamentoFiadoAsync(int vendaId, decimal valorPago, int formaPagamento)
+    {
+        var requestDto = new ReceberPagamentoGeralFiadoRequest
+        {
+            ValorPago = valorPago,
+            FormaPagamento = formaPagamento
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(_config.GetEndpointUrl($"/api/Venda/{vendaId}/pagamento-fiado"), requestDto);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var guidResult = await response.Content.ReadFromJsonAsync<Guid>();
+            return guidResult;
+        }
+
+        var erroTexto = await response.Content.ReadAsStringAsync();
+        throw new Exception(!string.IsNullOrEmpty(erroTexto) ? erroTexto : "Erro desconhecido ao processar o pagamento individual.");
+    }
 }
