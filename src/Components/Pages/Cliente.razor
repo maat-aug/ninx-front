@@ -1,4 +1,5 @@
 @page "/mainpage/clientes"
+@using NinxERP.Domain
 @using NinxERP.Domain.DTOs
 @using NinxERP.Domain.Interfaces
 @inject IClienteService ClienteService
@@ -18,7 +19,6 @@
     }
     else
     {
-        @* ── CABEÇALHO COM FILTRO RETRÁTIL SLIM ── *@
         <div class="estoque-header">
             <div class="header-left">
                 <h2><i class="bi bi-people"></i> Gerenciamento de Clientes</h2>
@@ -52,7 +52,6 @@
                     </button>
                 </div>
 
-                @* Mini Painel de Filtros *@
                 @if (exibirPainelFiltros)
                 {
                     <div class="dropdown-overlay" @onclick="() => exibirPainelFiltros = false"></div>
@@ -240,129 +239,119 @@
             </div>
         }
 
-        @* ── MODAL — HISTÓRICO DE VENDAS ── *@
         @if (modalHistoricoAberto)
         {
             <div class="modal-overlay" @onclick="FecharModalHistorico">
-                <div class="modal-card" style="max-width: 800px;" @onclick:stopPropagation="true">
+                <div class="modal-card modal-card-lg" @onclick:stopPropagation="true" style="max-width: 900px;">
+            
                     <div class="modal-header">
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <h4><i class="bi bi-receipt"></i> Histórico de Vendas - @clienteSelecionado?.Nome</h4>
-                            <button class="btn-action primary" style="padding: 6px 14px; font-size: 0.85rem;" @onclick="AbrirModalPagamentoGeral">
-                                <i class="bi bi-cash-coin"></i> Receber Pagamento Global
-                            </button>
-                        </div>
+                        <h4>
+                            <i class="bi bi-clock-history text-info"></i> 
+                            Histórico de Vendas Fiadas — @clienteSelecionado?.Nome
+                        </h4>
                         <button class="btn-fechar-modal" @onclick="FecharModalHistorico"><i class="bi bi-x-lg"></i></button>
                     </div>
 
                     <div class="modal-body">
-                        @if (isCarregandoHistorico)
+                        @if (vendasHistorico == null)
                         {
-                            <div class="loading-state">
-                                <div class="spinner-border text-primary" style="width:2rem;height:2rem;"></div>
-                                <p>Buscando histórico...</p>
-                            </div>
+                            <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
                         }
                         else if (!vendasHistorico.Any())
                         {
-                            <div class="empty-state">
-                                <i class="bi bi-inbox text-muted"></i>
-                                <h4>Nenhuma venda encontrada</h4>
-                                <p>Este cliente ainda não possui histórico de compras.</p>
-                            </div>
+                            <div class="alert-estoque info text-center"><i class="bi bi-info-circle-fill"></i> Nenhuma venda fiada registrada para este cliente.</div>
                         }
                         else
                         {
-                            <div class="table-wrapper" style="max-height: 400px;">
-                            
-                                <table class="tabela-estoque">
+                            @* 1. SUBSTITUI O MARGIN-BOTTOM DO TOP PARTE POR ESTA ESTRUTURA COM AS CLASSES NOVAS *@
+                            <div class="resumo-financeiro-grid">
+                                <div class="resumo-card-item">
+                                    <span class="titulo-resumo">Total em Compras</span>
+                                    <h3 class="valor-resumo" style="color: #fff;">@vendasHistorico.Sum(v => v.Total).ToString("C")</h3>
+                                </div>
+                                <div class="resumo-card-item border-lateral">
+                                    <span class="titulo-resumo">Total Já Pago</span>
+                                    <h3 class="valor-resumo text-success">@vendasHistorico.Sum(v => v.ValorPago).ToString("C")</h3>
+                                </div>
+                                <div class="resumo-card-item">
+                                    <span class="titulo-resumo">Saldo Devedor Atual</span>
+                                    <h3 class="valor-resumo text-danger">@vendasHistorico.Sum(v => v.SaldoDevedor).ToString("C")</h3>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table-modern">
                                     <thead>
                                         <tr>
-                                            <th>Data</th>
+                                            <th>Data / Hora</th>
                                             <th>Status</th>
-                                            <th class="text-end">Total</th>
-                                            <th class="text-center">Documento</th>
+                                            <th class="text-end">Total Venda</th>
+                                            <th class="text-end">Total Pago</th>
+                                            <th class="text-end">Ainda Deve</th>
+                                            <th class="text-center">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var venda in vendasHistorico)
                                         {
-                                            @* ── LINHA PRINCIPAL DA VENDA ── *@
-                                            <tr>
+                                            <tr style="@(venda.SaldoDevedor == 0 ? "opacity: 0.45;" : "")">
                                                 <td>@venda.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
-                                                <td>@venda.Status</td>
-                                                <td class="text-end fw-bold">@venda.Total.ToString("C")</td>
+                                                <td>
+                                                    @if (venda.SaldoDevedor == 0)
+                                                    {
+                                                        <span class="badge bg-success">Quitada</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-warning">Pendente</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end">@venda.Total.ToString("C")</td>
+                                                <td class="text-end text-success">@venda.ValorPago.ToString("C")</td>
+                                                <td class="text-end fw-bold @(venda.SaldoDevedor > 0 ? "text-danger" : "text-muted")">
+                                                    @venda.SaldoDevedor.ToString("C")
+                                                </td>
                                                 <td class="text-center">
-                                                    <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
-
-                                                        @* 1. Botão do PDF Original da Venda (Usa o FirstOrDefault que é o contrato inicial) *@
-                                                        <button class="btn-action secondary" style="padding: 6px 12px; font-size: 0.8rem;"
-                                                                @onclick="() => BaixarDocumentoPdf(venda.DocumentoGuid.FirstOrDefault())"
-                                                                disabled="@(isBaixandoDoc || !venda.DocumentoGuid.Any())"
-                                                                title="Baixar PDF Original da Venda">
-                                                            <i class="bi bi-file-earmark-pdf text-danger"></i> PDF Venda
-                                                        </button>
-
-                                                        <button class="btn-action secondary" style="padding: 6px 12px; font-size: 0.8rem; background: rgba(40, 167, 69, 0.1); border-color: rgba(40, 167, 69, 0.2);"
+                                                    <div style="display: flex; gap: 6px; justify-content: center;">
+                                                        <button class="btn-action secondary" style="padding: 4px 8px; font-size: 0.75rem;" 
                                                                 @onclick="() => AbrirModalPagamentoIndividual(venda)"
-                                                                title="Pagar esta venda">
-                                                            <i class="bi bi-cash text-success"></i> Pagar
+                                                                disabled="@(venda.SaldoDevedor <= 0)">
+                                                            <i class="bi bi-cash-coin"></i> Pagar
                                                         </button>
-
-                                                        @* 2. Botão Setinha para Abrir/Fechar os Pagamentos (Dropable) *@
-                                                        @* 2. Botão Setinha para Abrir/Fechar os Pagamentos (Exibe APENAS se houver mais de um documento) *@
-                                                        @if (venda.DocumentoGuid != null && venda.DocumentoGuid.Count() > 1)
-                                                        {
-                                                            <button class="btn-action secondary" style="padding: 6px 10px; font-size: 0.8rem; background: rgba(255,255,255,0.05);"
-                                                                    @onclick="() => ToggleExpandirVenda(venda.VendaID)">
-                                                                <i class="bi @(vendaExpandidaId == venda.VendaID ? "bi-chevron-up text-info" : "bi-chevron-down")"></i>
-                                                            </button>
-                                                        }
-                                                        else
-                                                        {
-                                                            @* Opcional: Renderiza um espaço vazio ou um ícone desabilitado discretamente para manter o alinhamento da tabela *@
-                                                            <div style="width: 32px;"></div>
-                                                        }
+                                                        <button class="btn-action secondary" style="padding: 4px 8px; font-size: 0.75rem;" 
+                                                                @onclick="() => ToggleExpandirVenda(venda.VendaID)">
+                                                            <i class="bi @(vendaExpandidaId == venda.VendaID ? "bi-chevron-up text-info" : "bi-chevron-down")"></i>
+                                                            Recibos
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
 
-                                            @* ── SUB-LINHA (DROPABLE) COM HISTÓRICO DE PAGAMENTOS ── *@
                                             @if (vendaExpandidaId == venda.VendaID)
                                             {
-                                                <tr style="background-color: rgba(14, 165, 233, 0.03); border-left: 3px solid #0ea5e9;">
-                                                    <td colspan="4" style="padding: 12px 20px;">
-                                                        <div style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-                                                            <h5 style="margin: 0 0 8px 0; font-size: 0.9rem; color: #0ea5e9; display: flex; align-items: center; gap: 6px;">
-                                                                <i class="bi bi-cash-stack"></i> Comprovantes e Pagamentos Vinculados
-                                                            </h5>
-
+                                                <tr class="sublinha-recibos">
+                                                    <td colspan="6">
+                                                        <div class="recibos-container">
+                                                            <span class="text-muted"><i class="bi bi-info-circle"></i> Extrato de Amortização desta compra:</span>
+                                                            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
+                                                                <div>Valor Original da Venda: <strong>@venda.Total.ToString("C")</strong></div>
+                                                                <div class="text-success">Total já amortizado pelo cliente: <strong>@venda.Total.ToString("C")</strong></div>
+                                                                <div class="text-danger">Saldo Restante para quitação: <strong>@venda.SaldoDevedor.ToString("C")</strong></div>
+                                                            </div>
+                                
                                                             @if (venda.DocumentoGuid != null && venda.DocumentoGuid.Count() > 1)
                                                             {
-                                                                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
-                                                                    @* Ignoramos o primeiro da lista (.Skip(1)), pois o primeiro é o PDF original da venda *@
-                                                                    @{
-                                                                        int indexPagamento = 1;
-                                                                    }
+                                                                <div style="margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                                                                    <span class="text-muted small">Comprovantes de pagamento anteriores:</span>
                                                                     @foreach (var guid in venda.DocumentoGuid.Skip(1))
                                                                     {
-                                                                        <div style="display: flex; align-items: center; justify-content: space-between; background: #1a1d24; padding: 6px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
-                                                                            <span><i class="bi bi-check2-circle text-success"></i> Recibo de Amortização de Dívida #@indexPagamento</span>
-
-                                                                            <button class="btn-action secondary" style="padding: 4px 10px; font-size: 0.75rem;"
-                                                                                    @onclick="() => BaixarDocumentoPdf(guid)"
-                                                                                    disabled="@isBaixandoDoc">
-                                                                                <i class="bi bi-file-earmark-pdf text-danger"></i> Baixar Recibo
+                                                                        <div class="recibo-item-linha">
+                                                                            <span>Recibo Parcial</span>
+                                                                            <button class="btn-action secondary" style="padding: 2px 6px; font-size: 0.7rem;" @onclick="() => BaixarDocumentoPdf(guid)">
+                                                                                <i class="bi bi-download text-danger"></i> PDF
                                                                             </button>
                                                                         </div>
-                                                                        indexPagamento++;
                                                                     }
-                                                                </div>
-                                                            }
-                                                            else
-                                                            {
-                                                                <div style="padding: 6px 0; color: rgba(255,255,255,0.4); font-style: italic;">
-                                                                    Nenhum pagamento ou amortização parcial foi registrado para esta venda ainda.
                                                                 </div>
                                                             }
                                                         </div>
@@ -372,20 +361,22 @@
                                         }
                                     </tbody>
                                 </table>
-
                             </div>
                         }
                     </div>
+
                     <div class="modal-footer">
-                        <button class="btn-action secondary" @onclick="FecharModalHistorico">Fechar</button>
+                        @if (vendasHistorico != null && vendasHistorico.Sum(v => v.SaldoDevedor) > 0)
+                        {
+                            <button class="btn-action primary" @onclick="AbrirModalPagamentoGeral">
+                                <i class="bi bi-cash-stack"></i> Pagar Todas as Vendas (Global)
+                            </button>
+                        }
                     </div>
+
                 </div>
             </div>
         }
-
-        @* ══════════════════════════════════════════════
-           MODAL — NOVO / EDITAR CLIENTE
-           ══════════════════════════════════════════════ *@
         @if (modalCadastroAberto)
         {
             <div class="modal-overlay" @onclick="FecharModalCadastro">
@@ -479,46 +470,97 @@
         }
 
         @* ── MODAL — RECEBER PAGAMENTO GERAL FIADO ── *@
+        @* ── MODAL — RECEBER PAGAMENTO (COM FLUXO DE ASSINATURA) ── *@
         @if (modalPagamentoGeralAberto)
         {
             <div class="modal-overlay" @onclick="FecharModalPagamentoGeral">
                 <div class="modal-card modal-card-sm" @onclick:stopPropagation="true">
                     <div class="modal-header">
-                        <h4><i class="bi bi-cash-coin text-success"></i> Pagamento Global</h4>
+                        <h4>
+                            <i class="bi bi-cash-coin text-success"></i>
+                            @(etapaModalPagamento == 1 ? "Dados do Pagamento" : "Assinatura Digital")
+                        </h4>
                         <button class="btn-fechar-modal" @onclick="FecharModalPagamentoGeral"><i class="bi bi-x-lg"></i></button>
                     </div>
+
                     <div class="modal-body">
-                        <div class="form-grid">
-                            <div class="form-group span-2">
-                                <label>Valor Total Pago (R$)</label>
-                                <input type="number" step="0.01" @bind="valorGlobalPago" class="form-input" placeholder="0,00" />
-                            </div>
-                            <div class="form-group span-2">
-                                <label>Forma de Pagamento</label>
-                                <select @bind="formaPagamentoSelecionada" class="form-input" style="background-color: #1a1d24;">
-                                    <option value="1">Dinheiro</option>
-                                    <option value="2">Cartão de Crédito</option>
-                                    <option value="3">Cartão de Débito</option>
-                                    <option value="4">PIX</option>
-                                </select>
-                            </div>
-                        </div>
-                        @if (!string.IsNullOrEmpty(mensagemErroPagamento))
+                        @if (etapaModalPagamento == 1)
                         {
-                            <div class="alert-estoque error mt-3">
-                                <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroPagamento
+                            <div class="form-grid">
+                                <div class="form-group span-2">
+                                    <label>Valor Total Pago (R$)</label>
+                                    <input type="number" step="0.01" @bind="valorGlobalDevedor" class="form-input" placeholder="0,00" />
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Forma de Pagamento</label>
+                                    <select @bind="formaPagamentoSelecionada" class="form-input" style="background-color: #1a1d24;">
+                                        <option value="@FormaPagamentoEnum.Dinheiro">Dinheiro</option>
+                                        <option value="@FormaPagamentoEnum.Cartao">Cartão</option>
+                                        <option value="@FormaPagamentoEnum.Pix">PIX</option>
+                                    </select>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(mensagemErroPagamento))
+                            {
+                                <div class="alert-estoque error mt-3"><i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroPagamento</div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center">
+                                <p class="text-muted small">Peça ao cliente para escanear o código para assinar o recibo.</p>
+
+                                @if (isGerandoQRCode)
+                                {
+                                    <div class="py-4"><div class="spinner-border text-primary"></div></div>
+                                }
+                                else if (!string.IsNullOrEmpty(qrCodeDataUrl))
+                                {
+                                    <div style="background: #fff; padding: 15px; border-radius: 12px; display: inline-block; margin-bottom: 15px;">
+                                        <img src="@qrCodeDataUrl" style="width: 200px; height: 200px;" />
+                                    </div>
+                                    <div style="margin-top: 5px; margin-bottom: 15px;">
+                                        <a href="@linkAssinaturaAtual" target="_blank" 
+                                           style="color: #0ea5e9; font-size: 0.75rem; text-decoration: underline; opacity: 0.75; transition: opacity 0.2s;"
+                                           onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.75'">
+                                            <i class="bi bi-box-arrow-up-right"></i> Ou clique aqui para abrir o link
+                                        </a>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(mensagemErroQR))
+                                {
+                                    <div class="alert-estoque error mt-2" style="font-size: 0.8rem;">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> @mensagemErroQR
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
+
                     <div class="modal-footer">
-                        <button class="btn-action secondary" @onclick="FecharModalPagamentoGeral">Cancelar</button>
-                        <button class="btn-action primary" @onclick="ProcessarPagamentoGeral" disabled="@isProcessandoPagamento">
-                            @if (isProcessandoPagamento)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1"></span>
-                            }
-                            Confirmar Quitação
-                        </button>
+                        @if (etapaModalPagamento == 1)
+                        {
+                            <button class="btn-action secondary" @onclick="FecharModalPagamentoGeral">Cancelar</button>
+                            <button class="btn-action primary" @onclick="ProcessarPagamentoGeral" disabled="@isProcessandoPagamento">
+                                @if (isProcessandoPagamento)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Pagar
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn-action secondary" @onclick="() => etapaModalPagamento = 1">Voltar</button>
+                            <button class="btn-action success" @onclick="ValidarAssinaturaEProteger" disabled="@isValidandoAssinatura">
+                                @if (isValidandoAssinatura)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Verificar e Finalizar
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
@@ -528,7 +570,7 @@
 
 @code {
 
-
+    private string linkAssinaturaAtual = string.Empty;
     private VendaHistoricoDTO? vendaSelecionadaParaPagamento = null;
     private bool isPagamentoGlobal = true;
     private PaginatedResponse<ClienteDTO>? paginatedResult;
@@ -548,8 +590,8 @@
     private string mensagemErroModal = string.Empty;
     private bool modalPagamentoGeralAberto = false;
     private bool isProcessandoPagamento = false;
-    private decimal valorGlobalPago;
-    private int formaPagamentoSelecionada = 1;
+    private decimal valorGlobalDevedor;
+    private FormaPagamentoEnum formaPagamentoSelecionada = FormaPagamentoEnum.Dinheiro;
     private string mensagemErroPagamento = string.Empty;
     private int totalClientes = 0;
     private int totalAtivos = 0;
@@ -561,6 +603,12 @@
     private bool isBaixandoDoc = false;
     private List<VendaHistoricoDTO> vendasHistorico = new();
     private FormCliente formModel = new();
+    private int etapaModalPagamento = 1; 
+    private string qrCodeDataUrl = string.Empty;
+    private Guid documentoGuidAtual = Guid.Empty;
+    private bool isGerandoQRCode = false;
+    private bool isValidandoAssinatura = false;
+    private string mensagemErroQR = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -810,7 +858,6 @@
         try
         {
 
-            // Busca o Base64 na API
 
             var response = await VendaService.GetDocumentoById(guid);
 
@@ -837,33 +884,31 @@
         }
     }
 
-    private void FecharModalPagamentoGeral() => modalPagamentoGeralAberto = false;
-
-    private void AbrirModalPagamentoGeral()
-    {
-        vendaSelecionadaParaPagamento = null;
-        isPagamentoGlobal = true;
-        mensagemErroPagamento = string.Empty;
-        valorGlobalPago = 0;
-        formaPagamentoSelecionada = 1;
-        modalPagamentoGeralAberto = true;
-    }
-
     private void AbrirModalPagamentoIndividual(VendaHistoricoDTO venda)
     {
         vendaSelecionadaParaPagamento = venda;
         isPagamentoGlobal = false;
         mensagemErroPagamento = string.Empty;
         
-        valorGlobalPago = venda.Total; 
-        formaPagamentoSelecionada = 1;
+        valorGlobalDevedor = venda.SaldoDevedor; 
+        modalPagamentoGeralAberto = true;
+        formaPagamentoSelecionada = FormaPagamentoEnum.Dinheiro;
+    }
+
+    private void AbrirModalPagamentoGeral()
+    {
+        etapaModalPagamento = 1; 
+        vendaSelecionadaParaPagamento = null;
+        isPagamentoGlobal = true;
+        mensagemErroPagamento = string.Empty;
+        valorGlobalDevedor = 0;
+        formaPagamentoSelecionada = FormaPagamentoEnum.Dinheiro;
         modalPagamentoGeralAberto = true;
     }
 
     private async Task ProcessarPagamentoGeral()
     {
-        if (clienteSelecionado == null) return;
-        if (valorGlobalPago <= 0)
+        if (valorGlobalDevedor <= 0)
         {
             mensagemErroPagamento = "Insira um valor maior que zero.";
             return;
@@ -874,41 +919,102 @@
 
         try
         {
-            Guid documentoGuid;
-
             if (isPagamentoGlobal)
             {
-                documentoGuid = await VendaService.ReceberPagamentoGeralFiadoAsync(
-                    clienteSelecionado.ClienteID, 
-                    valorGlobalPago, 
+                documentoGuidAtual = await VendaService.ReceberPagamentoGeralFiadoAsync(
+                    clienteSelecionado!.ClienteID,
+                    valorGlobalDevedor,
                     formaPagamentoSelecionada
                 );
-                mensagemSucesso = "Pagamento global distribuído com sucesso!";
             }
             else
             {
-                documentoGuid = await VendaService.ReceberPagamentoFiadoAsync(
+                documentoGuidAtual = await VendaService.ReceberPagamentoFiadoAsync(
                     vendaSelecionadaParaPagamento!.VendaID,
-                    valorGlobalPago,
+                    valorGlobalDevedor,
                     formaPagamentoSelecionada
                 );
-                mensagemSucesso = $"Pagamento da venda #{vendaSelecionadaParaPagamento.VendaID} processado!";
             }
-            
-            FecharModalPagamentoGeral();
-            FecharModalHistorico();
-            await CarregarDados();
 
-            await BaixarDocumentoPdf(documentoGuid);
+            if (documentoGuidAtual != Guid.Empty)
+            {
+                mensagemErroQR = string.Empty;
+                isGerandoQRCode = true;
+
+               linkAssinaturaAtual = $"https://seudominio.com/documento/{documentoGuidAtual}";
+
+                qrCodeDataUrl = GerarQrCodeAssinatura(linkAssinaturaAtual);
+
+                isGerandoQRCode = false;
+                etapaModalPagamento = 2; 
+            }
         }
         catch (Exception ex)
         {
-            mensagemErroPagamento = "Erro ao processar pagamento: " + ex.Message;
+            mensagemErroPagamento = "Erro ao processar: " + ex.Message;
         }
         finally
         {
             isProcessandoPagamento = false;
         }
+    }
+
+    public string GerarQrCodeAssinatura(string linkAssinatura)
+    {
+        try
+        {
+            var qrGenerator = new QRCoder.QRCodeGenerator();
+            var qrCodeData = qrGenerator.CreateQrCode(linkAssinatura, QRCoder.QRCodeGenerator.ECCLevel.Q);
+            var qrCode = new QRCoder.PngByteQRCode(qrCodeData);
+            var qrCodeImage = qrCode.GetGraphic(20);
+            return "data:image/png;base64," + Convert.ToBase64String(qrCodeImage);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao gerar QR Code: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+private async Task ValidarAssinaturaEProteger()
+    {
+        isValidandoAssinatura = true;
+        mensagemErroQR = string.Empty;
+
+        try
+        {
+            var assinado = await VendaService.VerificarDocumentoAssinadoAsync(documentoGuidAtual);
+
+            if (assinado)
+            {
+                mensagemSucesso = "Pagamento recebido e assinado com sucesso!";
+                
+                isValidandoAssinatura = false; 
+
+                FecharModalPagamentoGeral();
+                FecharModalHistorico();
+                
+                await CarregarDados();
+
+                await BaixarDocumentoPdf(documentoGuidAtual);
+            }
+            else
+            {
+                mensagemErroQR = "Aguardando assinatura. O cliente precisa escanear o código e assinar.";
+                isValidandoAssinatura = false; 
+            }
+        }
+        catch (Exception ex)
+        {
+            mensagemErroQR = "Falha ao validar: " + ex.Message;
+            isValidandoAssinatura = false; 
+        }
+    }
+
+    private void FecharModalPagamentoGeral()
+    {
+        if (isValidandoAssinatura) return;
+        modalPagamentoGeralAberto = false;
     }
 
     private class FormCliente

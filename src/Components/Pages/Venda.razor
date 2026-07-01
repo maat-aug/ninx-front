@@ -1,4 +1,5 @@
 @page "/mainpage/venda"
+@using NinxERP.Domain
 @using NinxERP.Domain.DTOs
 @using NinxERP.Domain.Interfaces
 @using NinxERP.Domain.Entities
@@ -217,16 +218,16 @@
                             <div class="checkout-step-content">
                                 <p class="step-label">Selecione o Método de Pagamento</p>
                                 <div class="payment-methods grid-3">
-                                    <button @onclick='() => SelecionarMetodoPagamento(2)'
-                                            class="method-btn @(metodoPagamentoSelecionado == 2 ? "active" : "")">
+                                    <button @onclick='() => SelecionarMetodoPagamento(FormaPagamentoEnum.Pix)'
+                                            class="method-btn @(metodoPagamentoSelecionado == FormaPagamentoEnum.Pix ? "active" : "")">
                                         <i class="bi bi-qr-code"></i> PIX
                                     </button>
-                                    <button @onclick='() => SelecionarMetodoPagamento(3)'
-                                            class='method-btn @(metodoPagamentoSelecionado == 3 ? "active" : "")'>
+                                    <button @onclick='() => SelecionarMetodoPagamento(FormaPagamentoEnum.Cartao)'
+                                            class='method-btn @(metodoPagamentoSelecionado == FormaPagamentoEnum.Cartao ? "active" : "")'>
                                         <i class="bi bi-credit-card"></i> CARTÃO
                                     </button>
-                                    <button @onclick='() => SelecionarMetodoPagamento(1)'
-                                            class="method-btn @(metodoPagamentoSelecionado == 1 ? "active" : "")">
+                                    <button @onclick='() => SelecionarMetodoPagamento(FormaPagamentoEnum.Dinheiro)'
+                                            class="method-btn @(metodoPagamentoSelecionado == FormaPagamentoEnum.Dinheiro ? "active" : "")">
                                         <i class="bi bi-cash-stack"></i> DINHEIRO
                                     </button>
                                 </div>
@@ -241,7 +242,7 @@
                                                 <span class="value">R$ @totalVenda.ToString("N2")</span>
                                             </div>
                                             
-                                            @if (metodoPagamentoSelecionado == 1 || tipoVendaSelecionado == 2)
+                                            @if (metodoPagamentoSelecionado == FormaPagamentoEnum.Dinheiro || tipoVendaSelecionado == 2)
                                             {
                                                 <div class="summary-divider"></div>
                                                 <div class="summary-item input-mode">
@@ -249,7 +250,7 @@
                                                     <div class="value-input-wrapper">
                                                         <span class="prefix">R$</span>
             
-                                                        @if (metodoPagamentoSelecionado == 1)
+                                                        @if (metodoPagamentoSelecionado == FormaPagamentoEnum.Dinheiro)
                                                         {
                                                             <input type="text"
                                                                    @ref="inputValorDinheiro"
@@ -737,7 +738,7 @@
     private bool isBuscandoProduto = false;
 
     private int tipoVendaSelecionado = 0;
-    private int metodoPagamentoSelecionado;
+    private FormaPagamentoEnum metodoPagamentoSelecionado;
 
     private decimal valorRecebido;
     private string valorRecebidoFormatado = "0,00";
@@ -932,7 +933,7 @@
         mensagemErro = string.Empty;
     }
 
-    private void SelecionarMetodoPagamento(int metodo)
+    private void SelecionarMetodoPagamento(FormaPagamentoEnum metodo)
     {
         metodoPagamentoSelecionado  = metodoPagamentoSelecionado == metodo ? 0 : metodo;
         valorRecebido               = 0;
@@ -958,7 +959,7 @@
 
         if (normal)
         {
-            if (metodoPagamentoSelecionado == 1) return valorRecebido >= totalVenda;
+            if (metodoPagamentoSelecionado == FormaPagamentoEnum.Dinheiro) return valorRecebido >= totalVenda;
             return true;
         }
 
@@ -998,11 +999,11 @@
         if (vendaResponse != null)
         {
             vendaIdAtual = vendaResponse.VendaID;
-            documentoGuidAtual = vendaResponse.DocumentoGuid;
+            documentoGuidAtual = vendaResponse.DocumentoGuid.FirstOrDefault();
 
             if (tipoVendaSelecionado == 2)
             {
-                await GerarQRCode(vendaResponse.DocumentoGuid);
+                await GerarQRCode(vendaResponse.DocumentoGuid.FirstOrDefault());
                 etapaAtual = 4;
             }
             else

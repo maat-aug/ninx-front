@@ -25,7 +25,7 @@ public class ItemVendaDTO
 
 public class PagamentoDTO
 {
-    public int FormaPagamento { get; set; }
+    public FormaPagamentoEnum FormaPagamento { get; set; }
     public decimal Valor { get; set; }
 }
 
@@ -38,7 +38,7 @@ public class VendaResponseDTO
     public string TipoVenda { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime CriadoEm { get; set; }
-    public Guid DocumentoGuid { get; set; }
+    public IEnumerable<Guid> DocumentoGuid { get; set; }
 }
 
 public class AssinaturaResponseDTO

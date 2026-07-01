@@ -3,6 +3,6 @@
     public class ReceberPagamentoGeralFiadoRequest
     {
         public decimal ValorPago { get; set; }
-        public int FormaPagamento { get; set; }
+        public FormaPagamentoEnum FormaPagamento { get; set; }
     }
 }

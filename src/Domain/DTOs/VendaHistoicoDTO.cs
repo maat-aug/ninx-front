@@ -10,5 +10,7 @@
         public string Status { get; set; } = string.Empty;
         public DateTime CriadoEm { get; set; }
         public IEnumerable<Guid> DocumentoGuid { get; set; } 
+        public decimal SaldoDevedor { get; set; }
+        public decimal ValorPago { get; set; }
     }
 }

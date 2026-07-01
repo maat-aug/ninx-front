@@ -843,6 +843,141 @@
     text-align: right;
 }
 
+/* ==========================================================================
+   🌟 NOVO: ESTILIZAÇÃO DO MODAL DE HISTÓRICO DE VENDAS FIADAS (DARK THEME)
+   ========================================================================== */
+
+/* Painel de Resumo Global no Topo do Modal */
+.resumo-financeiro-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.resumo-card-item {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+    .resumo-card-item .titulo-resumo {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .resumo-card-item .valor-resumo {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 700;
+    }
+
+/* Divisórias verticais elegantes entre os cards de resumo */
+.border-lateral {
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+}
+
+/* Ajustes e Correções para a Tabela Moderna */
+.table-responsive {
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: #15181e;
+    overflow: hidden;
+}
+
+.table-modern {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.88rem;
+}
+.table-modern th.text-end {
+    text-align: right !important;
+}
+
+    .table-modern th {
+        background: #1c1f26;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 600;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border-color);
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.5px;
+    }
+
+    .table-modern td {
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        color: #d1d5db;
+        vertical-align: middle;
+    }
+
+    .table-modern tbody tr:hover {
+        background: rgba(255, 255, 255, 0.015);
+    }
+
+/* Sub-linha expansível de recibos */
+.sublinha-recibos {
+    background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.recibos-container {
+    font-size: 0.82rem;
+    padding: 8px 4px;
+}
+
+.recibo-item-linha {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card);
+    padding: 8px 12px;
+    margin-top: 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+/* Classes utilitárias de Alinhamento e Cores */
+.text-end {
+    text-align: right !important;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.fw-bold {
+    font-weight: 700 !important;
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700; 
+    display: inline-block;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.bg-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+.bg-warning {
+    background: #f59e0b;
+    color: #111318 !important;
+}
+
 /* ── ANIMAÇÕES ── */
 @keyframes fadeIn {
     from { opacity: 0; }

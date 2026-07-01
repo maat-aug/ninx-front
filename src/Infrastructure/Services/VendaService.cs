@@ -1,4 +1,5 @@
 using NinxERP.Components.Pages;
+using NinxERP.Domain;
 using NinxERP.Domain.DTOs;
 using NinxERP.Domain.Interfaces;
 using NinxERP.Infrastructure.Config;
@@ -23,7 +24,6 @@ public class VendaService : IVendaService
     {
         try
         {
-            // Garante que o código de barras seja enviado corretamente como string na URL
             var url = _config.GetEndpointUrl($"/api/Produto/codigo-barras/{Uri.EscapeDataString(codigoBarras)}");
             return await _httpClient.GetFromJsonAsync<ProdutoDTO>(url);
         }
@@ -124,7 +124,7 @@ public class VendaService : IVendaService
         }
     }
 
-    public async Task<Guid> ReceberPagamentoGeralFiadoAsync(int clienteId, decimal valorTotalPago, int formaPagamento)
+    public async Task<Guid> ReceberPagamentoGeralFiadoAsync(int clienteId, decimal valorTotalPago, FormaPagamentoEnum formaPagamento)
     {
         var requestDto = new ReceberPagamentoGeralFiadoRequest
         {
@@ -144,7 +144,7 @@ public class VendaService : IVendaService
         throw new Exception(!string.IsNullOrEmpty(erroTexto) ? erroTexto : "Erro desconhecido ao processar o pagamento global.");
     }
 
-    public async Task<Guid> ReceberPagamentoFiadoAsync(int vendaId, decimal valorPago, int formaPagamento)
+    public async Task<Guid> ReceberPagamentoFiadoAsync(int vendaId, decimal valorPago, FormaPagamentoEnum formaPagamento)
     {
         var requestDto = new ReceberPagamentoGeralFiadoRequest
         {
